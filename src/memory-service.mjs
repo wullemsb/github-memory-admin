@@ -254,11 +254,6 @@ export async function deleteMemory({ id, ...options }) {
     }
   }
 
-  if (!clicked && target.buttonIndex < count) {
-    await buttons.nth(target.buttonIndex).click();
-    clicked = true;
-  }
-
   if (!clicked) {
     throw new Error('The delete action could not be matched to the selected memory.');
   }

@@ -7,14 +7,22 @@ export async function startServer(options = {}) {
   const port = options.port || 4173;
   const handler = createRequestHandler(options);
   const server = http.createServer(handler);
+  let shutdownPromise;
 
   await new Promise((resolve) => server.listen(port, host, resolve));
   const url = `http://${host}:${server.address().port}`;
   const shutdown = async () => {
+    if (shutdownPromise) {
+      return shutdownPromise;
+    }
+
     process.off('SIGINT', shutdown);
     process.off('SIGTERM', shutdown);
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-    await closeBrowser();
+    shutdownPromise = (async () => {
+      await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+      await closeBrowser();
+    })();
+    await shutdownPromise;
   };
 
   process.once('SIGINT', shutdown);

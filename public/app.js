@@ -28,7 +28,10 @@ function selectedRepository() {
 }
 
 function updateScopeVisibility() {
-  repositoryField.hidden = selectedScope() !== 'repo';
+  const isRepoScope = selectedScope() === 'repo';
+  repositoryField.hidden = !isRepoScope;
+  repositoryInput.disabled = !isRepoScope;
+  repositoryInput.setAttribute('aria-hidden', String(!isRepoScope));
 }
 
 function filteredMemories() {
