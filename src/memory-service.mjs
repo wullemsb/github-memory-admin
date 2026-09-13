@@ -149,14 +149,16 @@ function extractionScript(targetUrl, scope, owner, repo) {
   };
 }
 
-function decorateMemories(targetUrl, rawMemories) {
-  return dedupeMemories(rawMemories.map((memory) => ({
+function decorateMemories(targetUrl, rawMemories, { dedupe = true } = {}) {
+  const memories = rawMemories.map((memory) => ({
     ...memory,
     buttonIndex: memory.buttonIndex ?? memory.ordinal ?? 0,
     text: normalizeText(memory.text),
     title: normalizeText(memory.title || memory.text),
     id: createMemoryId(targetUrl, memory.buttonIndex ?? memory.ordinal ?? 0, memory.text),
-  })));
+  }));
+
+  return dedupe ? dedupeMemories(memories) : memories;
 }
 
 export async function listMemories(options = {}) {
@@ -232,7 +234,7 @@ export async function deleteMemory({ id, ...options }) {
     deletePatternSource: DELETE_LABEL.source,
   });
 
-  const memories = decorateMemories(targetUrl, rawMemories);
+  const memories = decorateMemories(targetUrl, rawMemories, { dedupe: false });
   const target = memories.find((memory) => memory.id === id);
   if (!target) {
     throw new Error('The requested memory entry could not be found. Refresh and try again.');

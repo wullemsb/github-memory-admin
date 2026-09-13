@@ -51,6 +51,17 @@
       </section>
     </main>
 
+    <dialog id="confirm-dialog">
+      <form method="dialog" class="dialog-card">
+        <h2 id="confirm-title">Delete memory</h2>
+        <p id="confirm-message"></p>
+        <menu>
+          <button value="cancel" class="secondary-button">Cancel</button>
+          <button value="confirm" id="confirm-delete" class="delete-button">Delete</button>
+        </menu>
+      </form>
+    </dialog>
+
     <template id="memory-template">
       <li class="memory-card">
         <div>

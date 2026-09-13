@@ -27,7 +27,8 @@ header p,
 .toolbar,
 .memory-card,
 .summary,
-.status {
+.status,
+.dialog-card {
   background: rgba(15, 23, 42, 0.85);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 12px;
@@ -122,6 +123,10 @@ button:focus-visible {
   background: #dc2626;
 }
 
+.secondary-button {
+  background: transparent;
+}
+
 .empty-state {
   padding: 2rem;
   text-align: center;
@@ -130,4 +135,27 @@ button:focus-visible {
 .status[data-error='true'] {
   border-color: rgba(248, 113, 113, 0.5);
   color: #fecaca;
+}
+
+dialog {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+dialog::backdrop {
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.dialog-card {
+  max-width: 32rem;
+  padding: 1.25rem;
+}
+
+.dialog-card menu {
+  display: flex;
+  justify-content: end;
+  gap: 0.75rem;
+  padding: 0;
+  margin: 1rem 0 0;
 }

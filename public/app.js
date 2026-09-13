@@ -8,8 +8,11 @@ const list = document.querySelector('#memories');
 const count = document.querySelector('#count');
 const status = document.querySelector('#status');
 const template = document.querySelector('#memory-template');
+const confirmDialog = document.querySelector('#confirm-dialog');
+const confirmMessage = document.querySelector('#confirm-message');
 
 let allMemories = [];
+let pendingDeletion;
 
 function setStatus(message, isError = false) {
   status.textContent = message;
@@ -96,12 +99,7 @@ async function refresh() {
   setStatus(payload.loginRequired ? (payload.message || 'Sign into GitHub and refresh.') : `Loaded ${allMemories.length} memory entries.`);
 }
 
-async function removeMemory(memory) {
-  const confirmation = window.confirm(`Delete this memory?\n\n${memory.text}`);
-  if (!confirmation) {
-    return;
-  }
-
+async function executeDeletion(memory) {
   setStatus('Deleting memory...');
   const response = await fetch('/api/memories', {
     method: 'DELETE',
@@ -124,6 +122,12 @@ async function removeMemory(memory) {
   setStatus(payload.loginRequired ? (payload.message || 'Sign into GitHub and retry.') : 'Memory deleted.');
 }
 
+function removeMemory(memory) {
+  pendingDeletion = memory;
+  confirmMessage.textContent = memory.text;
+  confirmDialog.showModal();
+}
+
 refreshButton.addEventListener('click', async () => {
   try {
     await refresh();
@@ -143,6 +147,20 @@ searchInput.addEventListener('input', render);
 scopeInput.addEventListener('change', () => {
   updateScopeVisibility();
   refresh().catch((error) => setStatus(error.message, true));
+});
+confirmDialog.addEventListener('close', async () => {
+  if (confirmDialog.returnValue !== 'confirm' || !pendingDeletion) {
+    pendingDeletion = undefined;
+    return;
+  }
+
+  try {
+    await executeDeletion(pendingDeletion);
+  } catch (error) {
+    setStatus(error.message, true);
+  } finally {
+    pendingDeletion = undefined;
+  }
 });
 
 updateScopeVisibility();
