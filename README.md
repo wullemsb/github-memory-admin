@@ -57,7 +57,7 @@ Expected format:
 ```json
 {
   "memories": [
-    { "ordinal": 0, "title": "Use TypeScript", "text": "Use TypeScript for new services." }
+    { "buttonIndex": 0, "title": "Use TypeScript", "text": "Use TypeScript for new services." }
   ]
 }
 ```

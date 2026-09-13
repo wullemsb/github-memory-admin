@@ -65,7 +65,7 @@ test('mock memory data can be listed and deleted', async () => {
 
   const next = JSON.parse(await readFile(mockDataPath, 'utf8'));
   assert.deepEqual(next.memories, [
-    { ordinal: 1, title: 'Write tests', text: 'Add focused unit tests.' },
+    { ordinal: 1, buttonIndex: 1, title: 'Write tests', text: 'Add focused unit tests.' },
   ]);
 });
 
@@ -83,4 +83,27 @@ test('mock deletion fails when the requested memory id is missing', async () => 
     deleteMemory({ mockDataPath, id: 'missing-id', scope: 'user' }),
     /could not be found/i,
   );
+});
+
+test('mock deletion preserves distinct ids for duplicate memory text', async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'github-memory-admin-'));
+  const mockDataPath = path.join(tempDir, 'mock-data.json');
+
+  await writeFile(mockDataPath, JSON.stringify({
+    memories: [
+      { buttonIndex: 0, title: 'Duplicate', text: 'Same text' },
+      { buttonIndex: 1, title: 'Duplicate', text: 'Same text' },
+    ],
+  }));
+
+  const listed = await listMemories({ mockDataPath });
+  assert.equal(listed.memories.length, 2);
+  assert.notEqual(listed.memories[0].id, listed.memories[1].id);
+
+  await deleteMemory({ mockDataPath, id: listed.memories[1].id, scope: 'user' });
+
+  const next = JSON.parse(await readFile(mockDataPath, 'utf8'));
+  assert.deepEqual(next.memories, [
+    { buttonIndex: 0, title: 'Duplicate', text: 'Same text' },
+  ]);
 });

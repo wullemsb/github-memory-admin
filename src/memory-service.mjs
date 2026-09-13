@@ -42,8 +42,8 @@ export function parseRepoInput(input) {
   return { owner, repo };
 }
 
-export function createMemoryId(targetUrl, ordinal, text) {
-  return sha(`${targetUrl}|${ordinal}|${normalizeText(text)}`);
+export function createMemoryId(targetUrl, buttonIndex, text) {
+  return sha(`${targetUrl}|${buttonIndex}|${normalizeText(text)}`);
 }
 
 export function dedupeMemories(memories) {
@@ -137,7 +137,7 @@ function extractionScript(targetUrl, scope, owner, repo) {
       const text = getMemoryText(container);
       const title = text.split(/\n+/).map((line) => line.trim()).find(Boolean) || text;
       return {
-        ordinal: index,
+        buttonIndex: index,
         title,
         text,
         scope,
@@ -152,9 +152,10 @@ function extractionScript(targetUrl, scope, owner, repo) {
 function decorateMemories(targetUrl, rawMemories) {
   return dedupeMemories(rawMemories.map((memory) => ({
     ...memory,
+    buttonIndex: memory.buttonIndex ?? memory.ordinal ?? 0,
     text: normalizeText(memory.text),
     title: normalizeText(memory.title || memory.text),
-    id: createMemoryId(targetUrl, memory.ordinal, memory.text),
+    id: createMemoryId(targetUrl, memory.buttonIndex ?? memory.ordinal ?? 0, memory.text),
   })));
 }
 
@@ -251,8 +252,8 @@ export async function deleteMemory({ id, ...options }) {
     }
   }
 
-  if (!clicked && target.ordinal < count) {
-    await buttons.nth(target.ordinal).click();
+  if (!clicked && target.buttonIndex < count) {
+    await buttons.nth(target.buttonIndex).click();
     clicked = true;
   }
 

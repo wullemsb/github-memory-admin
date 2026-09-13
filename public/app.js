@@ -71,7 +71,9 @@ function render() {
     const node = template.content.firstElementChild.cloneNode(true);
     node.querySelector('.memory-title').textContent = memory.title || memory.text;
     node.querySelector('.memory-body').textContent = memory.text;
-    node.querySelector('.delete-button').addEventListener('click', () => removeMemory(memory));
+    const deleteButton = node.querySelector('.delete-button');
+    deleteButton.setAttribute('aria-label', `Delete memory: ${memory.title || memory.text}`);
+    deleteButton.addEventListener('click', () => removeMemory(memory));
     list.append(node);
   }
 }

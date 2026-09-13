@@ -63,6 +63,13 @@ button {
   color: white;
 }
 
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
 .actions {
   display: flex;
   gap: 0.75rem;

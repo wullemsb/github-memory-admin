@@ -23,7 +23,15 @@ async function readBody(request) {
   for await (const chunk of request) {
     chunks.push(chunk);
   }
-  return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
+  if (!chunks.length) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    throw new Error('Request body must be valid JSON.');
+  }
 }
 
 function resolveScope(searchParams) {
