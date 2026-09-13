@@ -1,0 +1,126 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, system-ui, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+}
+
+.shell {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+header p,
+.status,
+.memory-body,
+.empty-state {
+  color: #cbd5e1;
+}
+
+.toolbar,
+.memory-card,
+.summary,
+.status {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  margin: 1.5rem 0 1rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+input,
+select,
+button {
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: #2563eb;
+  color: white;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.status,
+.summary {
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.metric .label {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.memories {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.memory-card {
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.memory-title {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.memory-body {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.memory-actions {
+  display: flex;
+  align-items: start;
+}
+
+.delete-button {
+  background: #dc2626;
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+}
+
+.status[data-error='true'] {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Memory Admin</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>GitHub Memory Admin</h1>
+        <p>Browse, export, and prune GitHub Copilot memory from your personal account or a repository.</p>
+      </header>
+
+      <section class="toolbar">
+        <label>
+          Scope
+          <select id="scope">
+            <option value="user">Personal memory</option>
+            <option value="repo">Repository memory</option>
+          </select>
+        </label>
+
+        <label id="repository-field">
+          Repository
+          <input id="repository" placeholder="owner/repo" spellcheck="false" />
+        </label>
+
+        <label>
+          Search
+          <input id="search" placeholder="Filter memories" spellcheck="false" />
+        </label>
+
+        <div class="actions">
+          <button id="refresh">Refresh</button>
+          <button id="export">Export JSON</button>
+        </div>
+      </section>
+
+      <section class="status" id="status">Ready.</section>
+      <section class="summary">
+        <div class="metric">
+          <span class="label">Visible entries</span>
+          <strong id="count">0</strong>
+        </div>
+      </section>
+
+      <section>
+        <ul id="memories" class="memories"></ul>
+      </section>
+    </main>
+
+    <template id="memory-template">
+      <li class="memory-card">
+        <div>
+          <h2 class="memory-title"></h2>
+          <p class="memory-body"></p>
+        </div>
+        <div class="memory-actions">
+          <button class="delete-button">Delete</button>
+        </div>
+      </li>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
