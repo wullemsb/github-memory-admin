@@ -104,7 +104,7 @@ async function isLoginRequired(page) {
 }
 
 function extractionScript(targetUrl, scope, owner, repo) {
-  return ({ targetUrl, scope, owner, repo, deletePatternSource }) => {
+  return ({ targetUrl, scope, owner, repo, deletePatternSource, annotateButtons }) => {
     const DELETE_PATTERN = new RegExp(deletePatternSource, 'i');
 
     const textOf = (node) => (node?.innerText || node?.textContent || '').replace(/\s+/g, ' ').trim();
@@ -133,6 +133,9 @@ function extractionScript(targetUrl, scope, owner, repo) {
     });
 
     return buttons.map((button, index) => {
+      if (annotateButtons) {
+        button.setAttribute('data-github-memory-admin-index', String(index));
+      }
       const container = makeContainer(button);
       const text = getMemoryText(container);
       const title = text.split(/\n+/).map((line) => line.trim()).find(Boolean) || text;
@@ -147,6 +150,20 @@ function extractionScript(targetUrl, scope, owner, repo) {
       };
     }).filter((item) => item.text);
   };
+}
+
+async function extractMemoriesFromPage(page, options, { annotateButtons = false } = {}) {
+  const targetUrl = buildMemoryUrl(options);
+  const rawMemories = await page.evaluate(extractionScript(targetUrl, options.scope, options.owner, options.repo), {
+    targetUrl,
+    scope: options.scope,
+    owner: options.owner ?? null,
+    repo: options.repo ?? null,
+    deletePatternSource: DELETE_LABEL.source,
+    annotateButtons,
+  });
+
+  return { targetUrl, rawMemories };
 }
 
 function decorateMemories(targetUrl, rawMemories, { dedupe = true } = {}) {
@@ -181,13 +198,7 @@ export async function listMemories(options = {}) {
     };
   }
 
-  const rawMemories = await page.evaluate(extractionScript(targetUrl, options.scope, options.owner, options.repo), {
-    targetUrl,
-    scope: options.scope,
-    owner: options.owner ?? null,
-    repo: options.repo ?? null,
-    deletePatternSource: DELETE_LABEL.source,
-  });
+  const { rawMemories } = await extractMemoriesFromPage(page, options);
 
   return {
     loginRequired: false,
@@ -226,13 +237,7 @@ export async function deleteMemory({ id, ...options }) {
     };
   }
 
-  const rawMemories = await page.evaluate(extractionScript(targetUrl, options.scope, options.owner, options.repo), {
-    targetUrl,
-    scope: options.scope,
-    owner: options.owner ?? null,
-    repo: options.repo ?? null,
-    deletePatternSource: DELETE_LABEL.source,
-  });
+  const { rawMemories } = await extractMemoriesFromPage(page, options, { annotateButtons: true });
 
   const memories = decorateMemories(targetUrl, rawMemories, { dedupe: false });
   const target = memories.find((memory) => memory.id === id);
@@ -240,23 +245,12 @@ export async function deleteMemory({ id, ...options }) {
     throw new Error('The requested memory entry could not be found. Refresh and try again.');
   }
 
-  const buttons = page.locator('button, a[role="button"], [role="button"]').filter({ hasText: DELETE_LABEL });
-  const count = await buttons.count();
-
-  let clicked = false;
-  for (let index = 0; index < count; index += 1) {
-    const button = buttons.nth(index);
-    const containerText = normalizeText(await button.locator('xpath=ancestor-or-self::*[self::li or self::article or self::tr or self::section or self::div][1]').textContent().catch(() => ''));
-    if (containerText && containerText.includes(target.text)) {
-      await button.click();
-      clicked = true;
-      break;
-    }
-  }
-
-  if (!clicked) {
+  const button = page.locator(`[data-github-memory-admin-index="${target.buttonIndex}"]`).first();
+  if (!await button.count()) {
     throw new Error('The delete action could not be matched to the selected memory.');
   }
+
+  await button.click();
 
   const confirmButton = page.getByRole('button', { name: /^(delete|remove)$/i }).last();
   if (await confirmButton.count()) {

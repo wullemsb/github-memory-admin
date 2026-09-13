@@ -13,6 +13,12 @@ const MIME_TYPES = new Map([
   ['.json', 'application/json; charset=utf-8'],
 ]);
 
+function validationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
 function json(response, status, payload) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(payload));
@@ -30,19 +36,23 @@ async function readBody(request) {
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
-    throw new Error('Request body must be valid JSON.');
+    throw validationError('Request body must be valid JSON.');
   }
 }
 
 function resolveScope(searchParams) {
   const scope = searchParams.get('scope') || 'user';
   if (scope !== 'user' && scope !== 'repo') {
-    throw new Error('Scope must be either "user" or "repo".');
+    throw validationError('Scope must be either "user" or "repo".');
   }
 
   const repoInput = searchParams.get('repository') || '';
   if (scope === 'repo') {
-    return { scope, ...parseRepoInput(repoInput) };
+    try {
+      return { scope, ...parseRepoInput(repoInput) };
+    } catch (error) {
+      throw validationError(error.message);
+    }
   }
 
   return { scope };
@@ -74,7 +84,15 @@ export function createRequestHandler(options = {}) {
 
       if (url.pathname === '/api/memories' && request.method === 'DELETE') {
         const body = await readBody(request);
-        const scopeOptions = body.scope === 'repo' ? { scope: 'repo', ...parseRepoInput(body.repository || '') } : { scope: 'user' };
+        const scopeOptions = body.scope === 'repo'
+          ? (() => {
+              try {
+                return { scope: 'repo', ...parseRepoInput(body.repository || '') };
+              } catch (error) {
+                throw validationError(error.message);
+              }
+            })()
+          : { scope: 'user' };
         const result = await deleteMemory({ ...options, ...scopeOptions, id: body.id });
         return json(response, 200, result);
       }
@@ -92,7 +110,7 @@ export function createRequestHandler(options = {}) {
 
       return json(response, 404, { error: 'Not found' });
     }).catch((error) => {
-      const status = error?.code === 'ENOENT' ? 404 : 400;
+      const status = error?.code === 'ENOENT' ? 404 : error?.statusCode || 500;
       const message = status === 404
         ? 'Not found'
         : error instanceof Error

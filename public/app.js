@@ -49,7 +49,7 @@ function downloadJson(filename, value) {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
 async function loadConfig() {
