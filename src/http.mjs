@@ -41,7 +41,11 @@ function resolveScope(searchParams) {
 }
 
 export async function serveStaticFile(pathname, response) {
-  const filePath = pathname === '/' ? path.join(PUBLIC_DIR, 'index.html') : path.join(PUBLIC_DIR, pathname.replace(/^\//, ''));
+  const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '');
+  const filePath = path.resolve(PUBLIC_DIR, relativePath);
+  if (!filePath.startsWith(`${PUBLIC_DIR}${path.sep}`) && filePath !== path.join(PUBLIC_DIR, 'index.html')) {
+    throw new Error('Invalid path.');
+  }
   const contents = await readFile(filePath);
   response.writeHead(200, {
     'content-type': MIME_TYPES.get(path.extname(filePath)) || 'application/octet-stream',
@@ -50,9 +54,9 @@ export async function serveStaticFile(pathname, response) {
 }
 
 export function createRequestHandler(options = {}) {
-  return async (request, response) => {
-    try {
-      const url = new URL(request.url, `http://${request.headers.host}`);
+  return (request, response) => {
+    Promise.resolve().then(async () => {
+      const url = new URL(request.url, `http://${request.headers.host || '127.0.0.1'}`);
 
       if (url.pathname === '/api/memories' && request.method === 'GET') {
         const scopeOptions = resolveScope(url.searchParams);
@@ -79,9 +83,14 @@ export function createRequestHandler(options = {}) {
       }
 
       return json(response, 404, { error: 'Not found' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return json(response, 400, { error: message });
-    }
+    }).catch((error) => {
+      const status = error?.code === 'ENOENT' ? 404 : 400;
+      const message = status === 404
+        ? 'Not found'
+        : error instanceof Error
+          ? error.message
+          : 'Unknown error';
+      return json(response, status, { error: message });
+    });
   };
 }

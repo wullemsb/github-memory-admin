@@ -138,7 +138,7 @@ exportButton.addEventListener('click', () => {
 searchInput.addEventListener('input', render);
 scopeInput.addEventListener('change', () => {
   updateScopeVisibility();
-  render();
+  refresh().catch((error) => setStatus(error.message, true));
 });
 
 updateScopeVisibility();

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -185,6 +185,17 @@ export async function listMemories(options = {}) {
 export async function deleteMemory({ id, ...options }) {
   if (!id) {
     throw new Error('A memory id is required for deletion.');
+  }
+
+  if (options.mockDataPath) {
+    const data = JSON.parse(await readFile(options.mockDataPath, 'utf8'));
+    const memories = decorateMemories('mock://memory', data.memories || []);
+    const nextMemories = memories.filter((memory) => memory.id !== id).map(({ id: _id, ...memory }) => memory);
+    if (nextMemories.length === memories.length) {
+      throw new Error('The requested memory entry could not be found. Refresh and try again.');
+    }
+    await writeFile(options.mockDataPath, JSON.stringify({ memories: nextMemories }, null, 2));
+    return { deleted: true, loginRequired: false, targetUrl: 'mock://memory' };
   }
 
   const page = await getPage(options);
