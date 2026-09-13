@@ -1,14 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { chromium } from 'playwright';
-
-const USER_MEMORY_URL = 'https://github.com/settings/copilot/memory';
-const DELETE_LABEL = /^(delete|remove)$/i;
-
-let browserContextPromise;
-let browserContextKey;
 
 function sha(input) {
   return createHash('sha256').update(input).digest('hex').slice(0, 16);
@@ -16,194 +9,115 @@ function sha(input) {
 
 export function normalizeText(value) {
   return String(value ?? '')
-    .replace(/\s+/g, ' ')
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .trim();
 }
 
-export function buildMemoryUrl({ scope, owner, repo }) {
+export function createMemoryId(scope, relativePath) {
+  return sha(`${scope}|${relativePath}`);
+}
+
+export function resolveUserMemoryDir({ platform = process.platform, homeDir = os.homedir(), appData = process.env.APPDATA } = {}) {
+  if (platform === 'win32') {
+    const root = appData || path.join(homeDir, 'AppData', 'Roaming');
+    return path.win32.join(root, 'Code', 'User', 'copilot', 'memories');
+  }
+
+  return path.join(homeDir, '.vscode', 'copilot', 'memories');
+}
+
+export function resolveMemoryStore({ scope = 'user', workspaceDir = process.cwd(), platform, homeDir, appData } = {}) {
   if (scope === 'user') {
-    return USER_MEMORY_URL;
+    return resolveUserMemoryDir({ platform, homeDir, appData });
   }
 
-  if (!owner || !repo) {
-    throw new Error('Repository scope requires both owner and repo.');
+  if (scope === 'session') {
+    return path.join(workspaceDir, '.github', 'copilot', 'memories', 'session');
   }
 
-  return `https://github.com/${owner}/${repo}/settings/copilot/memory`;
-}
-
-export function parseRepoInput(input) {
-  const normalized = normalizeText(input).replace(/^https:\/\/github\.com\//, '').replace(/^github\.com\//, '').replace(/^\//, '');
-  const [owner, repo, ...rest] = normalized.split('/').filter(Boolean);
-  if (!owner || !repo || rest.length > 0) {
-    throw new Error('Repository must be in the form owner/repo.');
+  if (scope === 'repo') {
+    return path.join(workspaceDir, '.github', 'copilot', 'memories');
   }
-  return { owner, repo };
+
+  throw new Error('Scope must be one of "user", "session", or "repo".');
 }
 
-export function createMemoryId(targetUrl, buttonIndex, text) {
-  return sha(`${targetUrl}|${buttonIndex}|${normalizeText(text)}`);
-}
+async function walkMemoryFiles(rootPath, currentPath, scope) {
+  const entries = await readdir(currentPath, { withFileTypes: true });
+  const files = [];
 
-export function dedupeMemories(memories) {
-  const seen = new Set();
-  return memories.filter((memory) => {
-    const key = `${memory.id}|${memory.text}`;
-    if (seen.has(key)) {
-      return false;
+  for (const entry of entries) {
+    if (scope === 'repo' && currentPath === rootPath && entry.isDirectory() && entry.name === 'session') {
+      continue;
     }
-    seen.add(key);
-    return true;
-  });
-}
 
-async function getBrowserContext({ headless = false, profileDir } = {}) {
-  const userDataDir = profileDir ?? path.join(os.homedir(), '.github-memory-admin', 'profile');
-  const nextContextKey = JSON.stringify({ headless, userDataDir });
+    const absolutePath = path.join(currentPath, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await walkMemoryFiles(rootPath, absolutePath, scope));
+      continue;
+    }
 
-  if (browserContextPromise && browserContextKey !== nextContextKey) {
-    const existingContext = await browserContextPromise;
-    await existingContext.close();
-    browserContextPromise = undefined;
-    browserContextKey = undefined;
+    if (entry.isFile()) {
+      files.push(absolutePath);
+    }
   }
 
-  if (!browserContextPromise) {
-    browserContextPromise = chromium.launchPersistentContext(userDataDir, {
-      headless,
-      viewport: { width: 1440, height: 1024 },
-    });
-    browserContextKey = nextContextKey;
-  }
-
-  return browserContextPromise;
+  return files;
 }
 
-async function getPage(options) {
-  const context = await getBrowserContext(options);
-  const existingPage = context.pages()[0];
-  return existingPage ?? context.newPage();
-}
+async function toMemory(rootPath, absolutePath, scope) {
+  const [contents, details] = await Promise.all([
+    readFile(absolutePath, 'utf8'),
+    stat(absolutePath),
+  ]);
 
-async function waitForSettled(page) {
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-}
+  const relativePath = path.relative(rootPath, absolutePath).split(path.sep).join('/');
+  const title = relativePath;
 
-async function isLoginRequired(page) {
-  const url = page.url();
-  if (url.includes('/login')) {
-    return true;
-  }
-
-  return page.evaluate(() => {
-    const text = document.body?.innerText ?? '';
-    return /sign in to github/i.test(text) || /verify your account/i.test(text);
-  });
-}
-
-function extractionScript(targetUrl, scope, owner, repo) {
-  return ({ targetUrl, scope, owner, repo, deletePatternSource, annotateButtons }) => {
-    const DELETE_PATTERN = new RegExp(deletePatternSource, 'i');
-
-    const textOf = (node) => (node?.innerText || node?.textContent || '').replace(/\s+/g, ' ').trim();
-
-    const makeContainer = (button) => {
-      let current = button.closest('li, article, tr, section, div');
-      while (current && current !== document.body) {
-        const text = textOf(current);
-        if (text.length > 0 && text.length < 2500) {
-          return current;
-        }
-        current = current.parentElement;
-      }
-      return button.parentElement || button;
-    };
-
-    const getMemoryText = (container) => {
-      const clone = container.cloneNode(true);
-      clone.querySelectorAll('button, a[role="button"], [data-view-component="true"] svg, summary').forEach((node) => node.remove());
-      return textOf(clone);
-    };
-
-    const buttons = Array.from(document.querySelectorAll('button, a[role="button"], [role="button"]')).filter((node) => {
-      const label = textOf(node);
-      return DELETE_PATTERN.test(label);
-    });
-
-    return buttons.map((button, index) => {
-      if (annotateButtons) {
-        button.setAttribute('data-github-memory-admin-index', String(index));
-      }
-      const container = makeContainer(button);
-      const text = getMemoryText(container);
-      const title = text.split(/\n+/).map((line) => line.trim()).find(Boolean) || text;
-      return {
-        buttonIndex: index,
-        title,
-        text,
-        scope,
-        owner,
-        repo,
-        deleteLabel: textOf(button),
-      };
-    }).filter((item) => item.text);
+  return {
+    id: createMemoryId(scope, relativePath),
+    title,
+    text: normalizeText(contents),
+    relativePath,
+    absolutePath,
+    scope,
+    size: details.size,
+    modifiedAt: details.mtime.toISOString(),
   };
 }
 
-async function extractMemoriesFromPage(page, options, { annotateButtons = false } = {}) {
-  const targetUrl = buildMemoryUrl(options);
-  const rawMemories = await page.evaluate(extractionScript(targetUrl, options.scope, options.owner, options.repo), {
-    targetUrl,
-    scope: options.scope,
-    owner: options.owner ?? null,
-    repo: options.repo ?? null,
-    deletePatternSource: DELETE_LABEL.source,
-    annotateButtons,
-  });
-
-  return { targetUrl, rawMemories };
-}
-
-function decorateMemories(targetUrl, rawMemories, { dedupe = true } = {}) {
-  const memories = rawMemories.map((memory) => ({
-    ...memory,
-    buttonIndex: memory.buttonIndex ?? memory.ordinal ?? 0,
-    text: normalizeText(memory.text),
-    title: normalizeText(memory.title || memory.text),
-    id: createMemoryId(targetUrl, memory.buttonIndex ?? memory.ordinal ?? 0, memory.text),
-  }));
-
-  return dedupe ? dedupeMemories(memories) : memories;
-}
-
 export async function listMemories(options = {}) {
-  if (options.mockDataPath) {
-    const data = JSON.parse(await readFile(options.mockDataPath, 'utf8'));
-    return { loginRequired: false, memories: decorateMemories('mock://memory', data.memories || []) };
+  const scope = options.scope || 'user';
+  const storePath = resolveMemoryStore({ ...options, scope });
+  let absoluteFiles;
+
+  try {
+    absoluteFiles = await walkMemoryFiles(storePath, storePath, scope);
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return {
+        exists: false,
+        storePath,
+        memories: [],
+        message: `No ${scope} memory directory was found at ${storePath}.`,
+      };
+    }
+    throw error;
   }
 
-  const page = await getPage(options);
-  const targetUrl = buildMemoryUrl(options);
-  await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
-  await waitForSettled(page);
-
-  if (await isLoginRequired(page)) {
-    return {
-      loginRequired: true,
-      targetUrl,
-      memories: [],
-      message: 'Sign into GitHub in the opened Playwright browser, then refresh this page.',
-    };
-  }
-
-  const { rawMemories } = await extractMemoriesFromPage(page, options);
+  const memories = await Promise.all(
+    absoluteFiles
+      .sort((left, right) => left.localeCompare(right))
+      .map((absolutePath) => toMemory(storePath, absolutePath, scope)),
+  );
 
   return {
-    loginRequired: false,
-    targetUrl,
-    memories: decorateMemories(targetUrl, rawMemories),
+    exists: true,
+    storePath,
+    memories,
+    message: memories.length
+      ? `Loaded ${memories.length} memory file${memories.length === 1 ? '' : 's'} from ${storePath}.`
+      : `No memory files were found in ${storePath}.`,
   };
 }
 
@@ -212,61 +126,23 @@ export async function deleteMemory({ id, ...options }) {
     throw new Error('A memory id is required for deletion.');
   }
 
-  if (options.mockDataPath) {
-    const data = JSON.parse(await readFile(options.mockDataPath, 'utf8'));
-    const memories = decorateMemories('mock://memory', data.memories || []);
-    const nextMemories = memories.filter((memory) => memory.id !== id).map(({ id: _id, ...memory }) => memory);
-    if (nextMemories.length === memories.length) {
-      throw new Error('The requested memory entry could not be found. Refresh and try again.');
-    }
-    await writeFile(options.mockDataPath, JSON.stringify({ memories: nextMemories }, null, 2));
-    return { deleted: true, loginRequired: false, targetUrl: 'mock://memory' };
-  }
-
-  const page = await getPage(options);
-  const targetUrl = buildMemoryUrl(options);
-  await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
-  await waitForSettled(page);
-
-  if (await isLoginRequired(page)) {
-    return {
-      loginRequired: true,
-      deleted: false,
-      targetUrl,
-      message: 'Sign into GitHub in the opened Playwright browser, then retry deletion.',
-    };
-  }
-
-  const { rawMemories } = await extractMemoriesFromPage(page, options, { annotateButtons: true });
-
-  const memories = decorateMemories(targetUrl, rawMemories, { dedupe: false });
+  const { memories, storePath } = await listMemories(options);
   const target = memories.find((memory) => memory.id === id);
   if (!target) {
     throw new Error('The requested memory entry could not be found. Refresh and try again.');
   }
 
-  const button = page.locator(`[data-github-memory-admin-index="${target.buttonIndex}"]`).first();
-  if (!await button.count()) {
-    throw new Error('The delete action could not be matched to the selected memory.');
+  const targetPath = path.resolve(storePath, target.relativePath);
+  const normalizedRoot = `${path.resolve(storePath)}${path.sep}`;
+  if (!targetPath.startsWith(normalizedRoot)) {
+    throw new Error('The requested memory entry is outside the allowed store path.');
   }
 
-  await button.click();
+  await rm(targetPath);
 
-  const confirmButton = page.getByRole('button', { name: /^(delete|remove)$/i }).last();
-  if (await confirmButton.count()) {
-    await confirmButton.click().catch(() => {});
-  }
-
-  await waitForSettled(page);
-  return { deleted: true, loginRequired: false, targetUrl };
-}
-
-export async function closeBrowser() {
-  if (!browserContextPromise) {
-    return;
-  }
-
-  const context = await browserContextPromise;
-  browserContextPromise = undefined;
-  await context.close();
+  return {
+    deleted: true,
+    storePath,
+    deletedPath: target.relativePath,
+  };
 }

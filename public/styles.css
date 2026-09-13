@@ -20,7 +20,8 @@ body {
 header p,
 .status,
 .memory-body,
-.empty-state {
+.empty-state,
+.memory-meta {
   color: #cbd5e1;
 }
 
@@ -83,9 +84,20 @@ button:focus-visible {
   margin-bottom: 1rem;
 }
 
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
 .metric .label {
   display: block;
   font-size: 0.9rem;
+}
+
+.metric strong {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
 .memories {
@@ -104,8 +116,14 @@ button:focus-visible {
 
 .memory-title {
   margin-top: 0;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   font-size: 1.1rem;
+}
+
+.memory-meta {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
 }
 
 .memory-body {

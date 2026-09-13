@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import path from 'node:path';
 import { startServer } from '../server.mjs';
 
 function getArg(name, defaultValue) {
@@ -16,25 +17,13 @@ function getArg(name, defaultValue) {
 
 const port = Number(getArg('port', process.env.PORT || 4173));
 const host = getArg('host', process.env.HOST || '127.0.0.1');
-const repository = getArg('repo', process.env.GITHUB_MEMORY_ADMIN_REPOSITORY || '');
-const headless = Boolean(getArg('headless', process.env.HEADLESS === '1'));
-const mockDataPath = process.env.GITHUB_MEMORY_ADMIN_MOCK_DATA || undefined;
+const workspaceDir = path.resolve(getArg('workspace', process.cwd()));
 
 const { url } = await startServer({
   port,
   host,
-  defaultRepository: repository,
-  headless,
-  mockDataPath,
+  workspaceDir,
 });
 
 console.log(`GitHub Memory Admin is running at ${url}`);
-if (repository) {
-  console.log(`Default repository scope: ${repository}`);
-}
-if (mockDataPath) {
-  console.log(`Using mock data from ${mockDataPath}`);
-}
-console.log(headless
-  ? 'Running Playwright in headless mode.'
-  : 'A persistent Playwright browser will open for GitHub authentication when needed.');
+console.log(`Scanning workspace memory stores under ${workspaceDir}`);

@@ -1,11 +1,11 @@
 const scopeInput = document.querySelector('#scope');
-const repositoryInput = document.querySelector('#repository');
-const repositoryField = document.querySelector('#repository-field');
 const searchInput = document.querySelector('#search');
 const refreshButton = document.querySelector('#refresh');
 const exportButton = document.querySelector('#export');
 const list = document.querySelector('#memories');
 const count = document.querySelector('#count');
+const storePath = document.querySelector('#store-path');
+const workspacePath = document.querySelector('#workspace-path');
 const status = document.querySelector('#status');
 const template = document.querySelector('#memory-template');
 const confirmDialog = document.querySelector('#confirm-dialog');
@@ -23,23 +23,12 @@ function selectedScope() {
   return scopeInput.value;
 }
 
-function selectedRepository() {
-  return repositoryInput.value.trim();
-}
-
-function updateScopeVisibility() {
-  const isRepoScope = selectedScope() === 'repo';
-  repositoryField.hidden = !isRepoScope;
-  repositoryInput.disabled = !isRepoScope;
-  repositoryInput.setAttribute('aria-hidden', String(!isRepoScope));
-}
-
 function filteredMemories() {
   const query = searchInput.value.trim().toLowerCase();
   if (!query) {
     return allMemories;
   }
-  return allMemories.filter((memory) => memory.text.toLowerCase().includes(query));
+  return allMemories.filter((memory) => `${memory.relativePath} ${memory.text}`.toLowerCase().includes(query));
 }
 
 function downloadJson(filename, value) {
@@ -55,9 +44,7 @@ function downloadJson(filename, value) {
 async function loadConfig() {
   const response = await fetch('/api/config');
   const config = await response.json();
-  if (config.defaultRepository) {
-    repositoryInput.value = config.defaultRepository;
-  }
+  workspacePath.textContent = config.workspaceDir || '-';
 }
 
 function render() {
@@ -68,17 +55,20 @@ function render() {
   if (!memories.length) {
     const empty = document.createElement('li');
     empty.className = 'empty-state';
-    empty.textContent = 'No memories matched your current selection.';
+    empty.textContent = searchInput.value.trim()
+      ? 'No memories matched your current search.'
+      : 'No memory files were found for this scope.';
     list.append(empty);
     return;
   }
 
   for (const memory of memories) {
     const node = template.content.firstElementChild.cloneNode(true);
-    node.querySelector('.memory-title').textContent = memory.title || memory.text;
-    node.querySelector('.memory-body').textContent = memory.text;
+    node.querySelector('.memory-title').textContent = memory.title || memory.relativePath;
+    node.querySelector('.memory-meta').textContent = `${memory.relativePath} • ${memory.size} bytes • ${new Date(memory.modifiedAt).toLocaleString()}`;
+    node.querySelector('.memory-body').textContent = memory.text || '(empty file)';
     const deleteButton = node.querySelector('.delete-button');
-    deleteButton.setAttribute('aria-label', `Delete memory: ${memory.title || memory.text}`);
+    deleteButton.setAttribute('aria-label', `Delete memory: ${memory.relativePath}`);
     deleteButton.addEventListener('click', () => removeMemory(memory));
     list.append(node);
   }
@@ -86,20 +76,16 @@ function render() {
 
 async function refresh() {
   setStatus('Loading memories...');
-  const params = new URLSearchParams({ scope: selectedScope() });
-  if (selectedScope() === 'repo') {
-    params.set('repository', selectedRepository());
-  }
-
-  const response = await fetch(`/api/memories?${params.toString()}`);
+  const response = await fetch(`/api/memories?scope=${selectedScope()}`);
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error || 'Unable to load memories.');
   }
 
   allMemories = payload.memories || [];
+  storePath.textContent = payload.storePath || '-';
   render();
-  setStatus(payload.loginRequired ? (payload.message || 'Sign into GitHub and refresh.') : `Loaded ${allMemories.length} memory entries.`);
+  setStatus(payload.message || `Loaded ${allMemories.length} memory entries.`);
 }
 
 async function executeDeletion(memory) {
@@ -110,7 +96,6 @@ async function executeDeletion(memory) {
     body: JSON.stringify({
       id: memory.id,
       scope: selectedScope(),
-      repository: selectedRepository(),
     }),
   });
   const payload = await response.json();
@@ -122,12 +107,12 @@ async function executeDeletion(memory) {
     allMemories = allMemories.filter((item) => item.id !== memory.id);
     render();
   }
-  setStatus(payload.loginRequired ? (payload.message || 'Sign into GitHub and retry.') : 'Memory deleted.');
+  setStatus(payload.deleted ? `Deleted ${payload.deletedPath}.` : 'Memory deleted.');
 }
 
 function removeMemory(memory) {
   pendingDeletion = memory;
-  confirmMessage.textContent = memory.text;
+  confirmMessage.textContent = `Delete ${memory.relativePath}?`;
   confirmDialog.showModal();
 }
 
@@ -140,15 +125,11 @@ refreshButton.addEventListener('click', async () => {
 });
 
 exportButton.addEventListener('click', () => {
-  const scope = selectedScope();
-  const repo = selectedRepository().replace('/', '-');
-  const suffix = scope === 'repo' && repo ? `-${repo}` : '';
-  downloadJson(`github-copilot-memory${suffix}.json`, filteredMemories());
+  downloadJson(`github-copilot-memory-${selectedScope()}.json`, filteredMemories());
 });
 
 searchInput.addEventListener('input', render);
 scopeInput.addEventListener('change', () => {
-  updateScopeVisibility();
   refresh().catch((error) => setStatus(error.message, true));
 });
 confirmDialog.addEventListener('close', async () => {
@@ -166,7 +147,6 @@ confirmDialog.addEventListener('close', async () => {
   }
 });
 
-updateScopeVisibility();
 loadConfig()
   .then(refresh)
   .catch((error) => setStatus(error.message, true));

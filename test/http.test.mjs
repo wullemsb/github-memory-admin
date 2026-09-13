@@ -36,21 +36,18 @@ test('DELETE /api/memories rejects malformed JSON bodies', async () => {
   assert.deepEqual(JSON.parse(response.body), { error: 'Request body must be valid JSON.' });
 });
 
-test('DELETE /api/memories validates repository scope input', async () => {
+test('GET /api/memories validates the scope query parameter', async () => {
   const handler = createRequestHandler();
   const response = makeResponse();
   const request = {
-    method: 'DELETE',
-    url: '/api/memories',
+    method: 'GET',
+    url: '/api/memories?scope=invalid',
     headers: { host: '127.0.0.1:4173' },
-    async *[Symbol.asyncIterator]() {
-      yield Buffer.from(JSON.stringify({ scope: 'repo', repository: 'invalid', id: '1' }));
-    },
   };
 
   handler(request, response);
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(response.statusCode, 400);
-  assert.deepEqual(JSON.parse(response.body), { error: 'Repository must be in the form owner/repo.' });
+  assert.deepEqual(JSON.parse(response.body), { error: 'Scope must be one of "user", "session", or "repo".' });
 });

@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deleteMemory, listMemories, parseRepoInput } from './memory-service.mjs';
+import { deleteMemory, listMemories } from './memory-service.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
+const VALID_SCOPES = new Set(['user', 'session', 'repo']);
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -40,22 +41,12 @@ async function readBody(request) {
   }
 }
 
-function resolveScope(searchParams) {
-  const scope = searchParams.get('scope') || 'user';
-  if (scope !== 'user' && scope !== 'repo') {
-    throw validationError('Scope must be either "user" or "repo".');
+function validateScope(scope) {
+  const normalizedScope = scope || 'user';
+  if (!VALID_SCOPES.has(normalizedScope)) {
+    throw validationError('Scope must be one of "user", "session", or "repo".');
   }
-
-  const repoInput = searchParams.get('repository') || '';
-  if (scope === 'repo') {
-    try {
-      return { scope, ...parseRepoInput(repoInput) };
-    } catch (error) {
-      throw validationError(error.message);
-    }
-  }
-
-  return { scope };
+  return normalizedScope;
 }
 
 export async function serveStaticFile(pathname, response) {
@@ -77,30 +68,21 @@ export function createRequestHandler(options = {}) {
       const url = new URL(request.url, `http://${request.headers.host || '127.0.0.1'}`);
 
       if (url.pathname === '/api/memories' && request.method === 'GET') {
-        const scopeOptions = resolveScope(url.searchParams);
-        const result = await listMemories({ ...options, ...scopeOptions });
+        const scope = validateScope(url.searchParams.get('scope'));
+        const result = await listMemories({ ...options, scope });
         return json(response, 200, result);
       }
 
       if (url.pathname === '/api/memories' && request.method === 'DELETE') {
         const body = await readBody(request);
-        const scopeOptions = body.scope === 'repo'
-          ? (() => {
-              try {
-                return { scope: 'repo', ...parseRepoInput(body.repository || '') };
-              } catch (error) {
-                throw validationError(error.message);
-              }
-            })()
-          : { scope: 'user' };
-        const result = await deleteMemory({ ...options, ...scopeOptions, id: body.id });
+        const scope = validateScope(body.scope);
+        const result = await deleteMemory({ ...options, scope, id: body.id });
         return json(response, 200, result);
       }
 
       if (url.pathname === '/api/config' && request.method === 'GET') {
         return json(response, 200, {
-          defaultRepository: options.defaultRepository || '',
-          headless: Boolean(options.headless),
+          workspaceDir: options.workspaceDir || process.cwd(),
         });
       }
 

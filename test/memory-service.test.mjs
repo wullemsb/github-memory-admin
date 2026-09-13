@@ -2,108 +2,99 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import {
-  buildMemoryUrl,
   createMemoryId,
   deleteMemory,
-  dedupeMemories,
   listMemories,
   normalizeText,
-  parseRepoInput,
+  resolveMemoryStore,
+  resolveUserMemoryDir,
 } from '../src/memory-service.mjs';
 
-test('normalizeText trims and collapses whitespace', () => {
-  assert.equal(normalizeText('  hello\n\nworld  '), 'hello world');
-});
+async function seedFile(filePath, contents) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, contents);
+}
 
-test('parseRepoInput accepts owner/repo and strips github URL prefixes', () => {
-  assert.deepEqual(parseRepoInput('https://github.com/octo/example'), {
-    owner: 'octo',
-    repo: 'example',
-  });
-});
-
-test('parseRepoInput rejects invalid values', () => {
-  assert.throws(() => parseRepoInput('octo'), /owner\/repo/);
-});
-
-test('buildMemoryUrl supports user and repository scopes', () => {
-  assert.equal(buildMemoryUrl({ scope: 'user' }), 'https://github.com/settings/copilot/memory');
-  assert.equal(buildMemoryUrl({ scope: 'repo', owner: 'octo', repo: 'example' }), 'https://github.com/octo/example/settings/copilot/memory');
-});
-
-test('createMemoryId is stable for the same inputs', () => {
-  const first = createMemoryId('https://github.com/settings/copilot/memory', 1, 'Use TypeScript');
-  const second = createMemoryId('https://github.com/settings/copilot/memory', 1, 'Use TypeScript');
-  assert.equal(first, second);
-});
-
-test('dedupeMemories removes exact duplicates', () => {
-  const memory = { id: '1', text: 'Use TypeScript' };
-  assert.deepEqual(dedupeMemories([memory, memory, { id: '2', text: 'Write tests' }]), [
-    memory,
-    { id: '2', text: 'Write tests' },
-  ]);
-});
-
-test('mock memory data can be listed and deleted', async () => {
+async function createFixture() {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'github-memory-admin-'));
-  const mockDataPath = path.join(tempDir, 'mock-data.json');
+  const workspaceDir = path.join(tempDir, 'workspace');
+  const homeDir = path.join(tempDir, 'home');
 
-  await writeFile(mockDataPath, JSON.stringify({
-    memories: [
-      { ordinal: 0, title: 'Use TypeScript', text: 'Use TypeScript for new services.' },
-      { ordinal: 1, title: 'Write tests', text: 'Add focused unit tests.' },
-    ],
-  }));
+  await seedFile(path.join(homeDir, '.vscode', 'copilot', 'memories', 'user.md'), 'Use TypeScript');
+  await seedFile(path.join(workspaceDir, '.github', 'copilot', 'memories', 'repo.md'), 'Repository memory');
+  await seedFile(path.join(workspaceDir, '.github', 'copilot', 'memories', 'nested', 'topic.md'), 'Nested repository memory');
+  await seedFile(path.join(workspaceDir, '.github', 'copilot', 'memories', 'session', 'task.md'), 'Session memory');
 
-  const initial = await listMemories({ mockDataPath });
-  assert.equal(initial.memories.length, 2);
+  return { workspaceDir, homeDir };
+}
 
-  await deleteMemory({ mockDataPath, id: initial.memories[0].id, scope: 'user' });
-
-  const next = JSON.parse(await readFile(mockDataPath, 'utf8'));
-  assert.deepEqual(next.memories, [
-    { ordinal: 1, buttonIndex: 1, title: 'Write tests', text: 'Add focused unit tests.' },
-  ]);
+test('normalizeText trims surrounding whitespace', () => {
+  assert.equal(normalizeText('  hello\n\nworld  '), 'hello\n\nworld');
 });
 
-test('mock deletion fails when the requested memory id is missing', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'github-memory-admin-'));
-  const mockDataPath = path.join(tempDir, 'mock-data.json');
-
-  await writeFile(mockDataPath, JSON.stringify({
-    memories: [
-      { ordinal: 0, title: 'Use TypeScript', text: 'Use TypeScript for new services.' },
-    ],
-  }));
-
-  await assert.rejects(
-    deleteMemory({ mockDataPath, id: 'missing-id', scope: 'user' }),
-    /could not be found/i,
+test('resolveUserMemoryDir supports linux/mac and windows conventions', () => {
+  assert.equal(
+    resolveUserMemoryDir({ platform: 'linux', homeDir: '/home/tester' }),
+    '/home/tester/.vscode/copilot/memories',
+  );
+  assert.equal(
+    resolveUserMemoryDir({ platform: 'win32', homeDir: 'C:\\Users\\tester', appData: 'C:\\Users\\tester\\AppData\\Roaming' }),
+    'C:\\Users\\tester\\AppData\\Roaming\\Code\\User\\copilot\\memories',
   );
 });
 
-test('mock deletion preserves distinct ids for duplicate memory text', async () => {
+test('resolveMemoryStore returns workspace-based session and repo paths', () => {
+  assert.equal(
+    resolveMemoryStore({ scope: 'session', workspaceDir: '/workspace' }),
+    '/workspace/.github/copilot/memories/session',
+  );
+  assert.equal(
+    resolveMemoryStore({ scope: 'repo', workspaceDir: '/workspace' }),
+    '/workspace/.github/copilot/memories',
+  );
+});
+
+test('createMemoryId is stable for the same inputs', () => {
+  const first = createMemoryId('repo', 'nested/topic.md');
+  const second = createMemoryId('repo', 'nested/topic.md');
+  assert.equal(first, second);
+});
+
+test('listMemories reads user, session, and repo stores from local disk', async () => {
+  const { workspaceDir, homeDir } = await createFixture();
+
+  const userResult = await listMemories({ scope: 'user', workspaceDir, homeDir, platform: 'linux' });
+  assert.equal(userResult.memories.length, 1);
+  assert.equal(userResult.memories[0].relativePath, 'user.md');
+
+  const sessionResult = await listMemories({ scope: 'session', workspaceDir, homeDir, platform: 'linux' });
+  assert.deepEqual(sessionResult.memories.map((memory) => memory.relativePath), ['task.md']);
+
+  const repoResult = await listMemories({ scope: 'repo', workspaceDir, homeDir, platform: 'linux' });
+  assert.deepEqual(repoResult.memories.map((memory) => memory.relativePath), ['nested/topic.md', 'repo.md']);
+});
+
+test('listMemories reports missing stores without throwing', async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'github-memory-admin-'));
-  const mockDataPath = path.join(tempDir, 'mock-data.json');
+  const result = await listMemories({ scope: 'session', workspaceDir: tempDir, homeDir: tempDir, platform: 'linux' });
+  assert.equal(result.exists, false);
+  assert.equal(result.memories.length, 0);
+  assert.match(result.message, /No session memory directory/i);
+});
 
-  await writeFile(mockDataPath, JSON.stringify({
-    memories: [
-      { buttonIndex: 0, title: 'Duplicate', text: 'Same text' },
-      { buttonIndex: 1, title: 'Duplicate', text: 'Same text' },
-    ],
-  }));
+test('deleteMemory removes the selected local file', async () => {
+  const { workspaceDir, homeDir } = await createFixture();
+  const repoResult = await listMemories({ scope: 'repo', workspaceDir, homeDir, platform: 'linux' });
+  const target = repoResult.memories.find((memory) => memory.relativePath === 'repo.md');
 
-  const listed = await listMemories({ mockDataPath });
-  assert.equal(listed.memories.length, 2);
-  assert.notEqual(listed.memories[0].id, listed.memories[1].id);
+  const deletion = await deleteMemory({ scope: 'repo', workspaceDir, homeDir, platform: 'linux', id: target.id });
+  assert.equal(deletion.deleted, true);
+  assert.equal(deletion.deletedPath, 'repo.md');
 
-  await deleteMemory({ mockDataPath, id: listed.memories[1].id, scope: 'user' });
-
-  const next = JSON.parse(await readFile(mockDataPath, 'utf8'));
-  assert.deepEqual(next.memories, [
-    { buttonIndex: 0, title: 'Duplicate', text: 'Same text' },
-  ]);
+  await assert.rejects(
+    readFile(path.join(workspaceDir, '.github', 'copilot', 'memories', 'repo.md'), 'utf8'),
+    /ENOENT/,
+  );
 });

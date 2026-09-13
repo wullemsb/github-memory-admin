@@ -10,21 +10,17 @@
     <main class="shell">
       <header>
         <h1>GitHub Memory Admin</h1>
-        <p>Browse, export, and prune GitHub Copilot memory from your personal account or a repository.</p>
+        <p>Browse, export, and prune GitHub Copilot memory files from your local user, session, and repository stores.</p>
       </header>
 
       <section class="toolbar">
         <label>
           Scope
           <select id="scope">
-            <option value="user">Personal memory</option>
+            <option value="user">User memory</option>
+            <option value="session">Session memory</option>
             <option value="repo">Repository memory</option>
           </select>
-        </label>
-
-        <label id="repository-field">
-          Repository
-          <input id="repository" placeholder="owner/repo" spellcheck="false" />
         </label>
 
         <label>
@@ -43,6 +39,14 @@
         <div class="metric">
           <span class="label">Visible entries</span>
           <strong id="count">0</strong>
+        </div>
+        <div class="metric">
+          <span class="label">Store path</span>
+          <strong id="store-path">-</strong>
+        </div>
+        <div class="metric">
+          <span class="label">Workspace</span>
+          <strong id="workspace-path">-</strong>
         </div>
       </section>
 
@@ -66,6 +70,7 @@
       <li class="memory-card">
         <div>
           <h2 class="memory-title"></h2>
+          <p class="memory-meta"></p>
           <p class="memory-body"></p>
         </div>
         <div class="memory-actions">

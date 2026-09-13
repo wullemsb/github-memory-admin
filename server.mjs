@@ -1,6 +1,5 @@
 import http from 'node:http';
 import { createRequestHandler } from './src/http.mjs';
-import { closeBrowser } from './src/memory-service.mjs';
 
 export async function startServer(options = {}) {
   const host = options.host || '127.0.0.1';
@@ -18,10 +17,9 @@ export async function startServer(options = {}) {
 
     process.off('SIGINT', shutdown);
     process.off('SIGTERM', shutdown);
-    shutdownPromise = (async () => {
-      await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-      await closeBrowser();
-    })();
+    shutdownPromise = new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
     await shutdownPromise;
   };
 
