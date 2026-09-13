@@ -8,6 +8,7 @@ const USER_MEMORY_URL = 'https://github.com/settings/copilot/memory';
 const DELETE_LABEL = /^(delete|remove)$/i;
 
 let browserContextPromise;
+let browserContextKey;
 
 function sha(input) {
   return createHash('sha256').update(input).digest('hex').slice(0, 16);
@@ -58,12 +59,22 @@ export function dedupeMemories(memories) {
 }
 
 async function getBrowserContext({ headless = false, profileDir } = {}) {
+  const userDataDir = profileDir ?? path.join(os.homedir(), '.github-memory-admin', 'profile');
+  const nextContextKey = JSON.stringify({ headless, userDataDir });
+
+  if (browserContextPromise && browserContextKey !== nextContextKey) {
+    const existingContext = await browserContextPromise;
+    await existingContext.close();
+    browserContextPromise = undefined;
+    browserContextKey = undefined;
+  }
+
   if (!browserContextPromise) {
-    const userDataDir = profileDir ?? path.join(os.homedir(), '.github-memory-admin', 'profile');
     browserContextPromise = chromium.launchPersistentContext(userDataDir, {
       headless,
       viewport: { width: 1440, height: 1024 },
     });
+    browserContextKey = nextContextKey;
   }
 
   return browserContextPromise;
@@ -226,7 +237,7 @@ export async function deleteMemory({ id, ...options }) {
     throw new Error('The requested memory entry could not be found. Refresh and try again.');
   }
 
-  const buttons = page.getByRole('button').filter({ hasText: DELETE_LABEL });
+  const buttons = page.locator('button, a[role="button"], [role="button"]').filter({ hasText: DELETE_LABEL });
   const count = await buttons.count();
 
   let clicked = false;

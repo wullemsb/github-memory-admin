@@ -18,7 +18,6 @@ const port = Number(getArg('port', process.env.PORT || 4173));
 const host = getArg('host', process.env.HOST || '127.0.0.1');
 const repository = getArg('repo', process.env.GITHUB_MEMORY_ADMIN_REPOSITORY || '');
 const headless = Boolean(getArg('headless', process.env.HEADLESS === '1'));
-const open = !process.argv.includes('--no-open');
 const mockDataPath = process.env.GITHUB_MEMORY_ADMIN_MOCK_DATA || undefined;
 
 const { url } = await startServer({
@@ -26,7 +25,6 @@ const { url } = await startServer({
   host,
   defaultRepository: repository,
   headless,
-  open,
   mockDataPath,
 });
 

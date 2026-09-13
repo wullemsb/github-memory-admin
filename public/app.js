@@ -115,8 +115,10 @@ async function removeMemory(memory) {
     throw new Error(payload.error || 'Unable to delete memory.');
   }
 
-  allMemories = allMemories.filter((item) => item.id !== memory.id);
-  render();
+  if (payload.deleted) {
+    allMemories = allMemories.filter((item) => item.id !== memory.id);
+    render();
+  }
   setStatus(payload.loginRequired ? (payload.message || 'Sign into GitHub and retry.') : 'Memory deleted.');
 }
 

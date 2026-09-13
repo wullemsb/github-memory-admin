@@ -68,3 +68,19 @@ test('mock memory data can be listed and deleted', async () => {
     { ordinal: 1, title: 'Write tests', text: 'Add focused unit tests.' },
   ]);
 });
+
+test('mock deletion fails when the requested memory id is missing', async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'github-memory-admin-'));
+  const mockDataPath = path.join(tempDir, 'mock-data.json');
+
+  await writeFile(mockDataPath, JSON.stringify({
+    memories: [
+      { ordinal: 0, title: 'Use TypeScript', text: 'Use TypeScript for new services.' },
+    ],
+  }));
+
+  await assert.rejects(
+    deleteMemory({ mockDataPath, id: 'missing-id', scope: 'user' }),
+    /could not be found/i,
+  );
+});

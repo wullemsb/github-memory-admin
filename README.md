@@ -21,7 +21,7 @@ npm start
 
 The app starts on `http://127.0.0.1:4173` by default.
 
-When you first load memory data, the tool opens a persistent Playwright-controlled Chromium window. Sign in to GitHub there, then refresh the local app.
+When you first load memory data, the tool launches a persistent Playwright-controlled Chromium window. Sign in to GitHub there, then refresh the local app.
 
 ## Usage
 
@@ -37,7 +37,6 @@ When you first load memory data, the tool opens a persistent Playwright-controll
 - `--host=<host>`: override the listening host.
 - `--repo=<owner/repo>`: prefill the repository selector.
 - `--headless`: run Playwright headless.
-- `--no-open`: do not automatically open the local UI.
 
 ## Development
 
