@@ -141,6 +141,24 @@ test('listMemories aggregates memories from all discovered stores', async () => 
   ]);
 });
 
+test('listMemories can combine user and repository memories for the UI', async () => {
+  const { rootDir, homeDir } = await createFixture();
+
+  const result = await listMemories({ scope: 'combined', rootDir, homeDir, platform: 'linux' });
+
+  assert.equal(result.stores.length, 3);
+  assert.deepEqual(result.stores.map((store) => `${store.scope}:${store.relativeWorkspacePath}`), [
+    'user:User scope',
+    'repo:alpha-hash',
+    'repo:nested/beta-hash',
+  ]);
+  assert.deepEqual(result.memories.map((memory) => `${memory.scope}:${memory.relativeWorkspacePath}:${memory.relativePath}`), [
+    'user:User scope:user.md',
+    'repo:alpha-hash:repo.md',
+    'repo:nested/beta-hash:ideas.md',
+  ]);
+});
+
 test('listMemories reports missing stores without throwing', async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'github-memory-admin-'));
   const result = await listMemories({ scope: 'repo', rootDir: tempDir, homeDir: tempDir, platform: 'linux' });

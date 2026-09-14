@@ -1,4 +1,3 @@
-const scopeInput = document.querySelector('#scope');
 const searchInput = document.querySelector('#search');
 const refreshButton = document.querySelector('#refresh');
 const exportButton = document.querySelector('#export');
@@ -26,10 +25,6 @@ let refreshRequestId = 0;
 function setStatus(message, isError = false) {
   status.textContent = message;
   status.dataset.error = isError ? 'true' : 'false';
-}
-
-function selectedScope() {
-  return scopeInput.value;
 }
 
 function visibleMemories() {
@@ -87,12 +82,21 @@ function renderStores() {
   if (!stores.length) {
     const empty = document.createElement('li');
     empty.className = 'empty-state';
-    empty.textContent = 'No stores found for this scope.';
+    empty.textContent = 'No user or repository memory stores found.';
     storesList.append(empty);
     return;
   }
 
+  let currentScope = '';
   for (const store of stores) {
+    if (store.scope !== currentScope) {
+      currentScope = store.scope;
+      const section = document.createElement('li');
+      section.className = 'store-section';
+      section.textContent = store.scope === 'user' ? 'User scope' : 'Repository scope';
+      storesList.append(section);
+    }
+
     const node = storeTemplate.content.firstElementChild.cloneNode(true);
     const button = node.querySelector('.store-button');
     button.dataset.active = String(store.id === selectedStoreId);
@@ -168,9 +172,8 @@ function render() {
 
 async function refresh() {
   const requestId = ++refreshRequestId;
-  const scope = selectedScope();
   setStatus('Loading memories...');
-  const response = await fetch(`/api/memories?scope=${scope}`);
+  const response = await fetch('/api/memories?scope=combined');
   const payload = await response.json();
   if (requestId !== refreshRequestId) {
     return;
@@ -193,7 +196,7 @@ async function executeDeletion(memory) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       id: memory.id,
-      scope: selectedScope(),
+      scope: memory.scope,
     }),
   });
   const payload = await response.json();
@@ -229,16 +232,11 @@ refreshButton.addEventListener('click', async () => {
 });
 
 exportButton.addEventListener('click', () => {
-  downloadJson(`github-copilot-memory-${selectedScope()}.json`, visibleMemories());
+  downloadJson('github-copilot-memory.json', visibleMemories());
 });
 
 searchInput.addEventListener('input', () => {
   render();
-});
-scopeInput.addEventListener('change', () => {
-  selectedStoreId = '';
-  selectedMemoryId = '';
-  refresh().catch((error) => setStatus(error.message, true));
 });
 confirmDialog.addEventListener('close', async () => {
   if (confirmDialog.returnValue !== 'confirm' || !pendingDeletion) {

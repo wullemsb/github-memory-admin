@@ -223,6 +223,36 @@ async function listStoreMemories(store) {
 
 export async function listMemories(options = {}) {
   const scope = options.scope || 'user';
+  if (scope === 'combined') {
+    const [userResult, repoResult] = await Promise.all([
+      listMemories({ ...options, scope: 'user' }),
+      listMemories({ ...options, scope: 'repo' }),
+    ]);
+    const stores = [...userResult.stores, ...repoResult.stores];
+    const memories = [...userResult.memories, ...repoResult.memories];
+    const rootDir = resolveRootDir(options);
+
+    if (!stores.length) {
+      return {
+        exists: false,
+        scope,
+        rootDir,
+        stores: [],
+        memories: [],
+        message: `No user memory directory was found at ${resolveUserMemoryDir(options)} and no repo memory stores were found under ${rootDir}.`,
+      };
+    }
+
+    return {
+      exists: true,
+      scope,
+      rootDir,
+      stores,
+      memories,
+      message: `Loaded ${memories.length} memory file${memories.length === 1 ? '' : 's'} from ${stores.length} store${stores.length === 1 ? '' : 's'}.`,
+    };
+  }
+
   const stores = await discoverMemoryStores(options);
   const rootDir = scope === 'user' ? null : resolveRootDir(options);
 

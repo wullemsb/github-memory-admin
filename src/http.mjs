@@ -5,7 +5,7 @@ import { deleteMemory, listMemories, resolveWorkspaceStorageDir } from './memory
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
-const VALID_SCOPES = new Set(['user', 'session', 'repo']);
+const VALID_SCOPES = new Set(['user', 'session', 'repo', 'combined']);
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -44,7 +44,7 @@ async function readBody(request) {
 function validateScope(scope) {
   const normalizedScope = scope || 'user';
   if (!VALID_SCOPES.has(normalizedScope)) {
-    throw validationError('Scope must be one of "user", "session", or "repo".');
+    throw validationError('Scope must be one of "user", "session", "repo", or "combined".');
   }
   return normalizedScope;
 }
