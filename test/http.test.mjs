@@ -27,6 +27,8 @@ async function waitForResponse(response) {
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+
+  throw new Error('Timed out waiting for the HTTP handler to write a response.');
 }
 
 test('DELETE /api/memories rejects malformed JSON bodies', async () => {

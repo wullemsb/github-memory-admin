@@ -48,6 +48,14 @@ function storeLabel(store) {
   return store.relativeWorkspacePath || 'User scope';
 }
 
+function deleteScopeFor(memory) {
+  if (memory.scope === 'user' || memory.scope === 'session' || memory.scope === 'repo') {
+    return memory.scope;
+  }
+
+  throw new Error(`Memories from scope "${memory.scope}" cannot be deleted from the current view.`);
+}
+
 function downloadJson(filename, value) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -196,7 +204,7 @@ async function executeDeletion(memory) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       id: memory.id,
-      scope: memory.scope,
+      scope: deleteScopeFor(memory),
     }),
   });
   const payload = await response.json();
