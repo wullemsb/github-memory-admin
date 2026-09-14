@@ -3,8 +3,25 @@ import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules']);
+
 function sha(input) {
   return createHash('sha256').update(input).digest('hex').slice(0, 16);
+}
+
+async function getPathStats(targetPath) {
+  try {
+    return await stat(targetPath);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function toPosix(relativePath) {
+  return relativePath.split(path.sep).join('/');
 }
 
 export function normalizeText(value) {
@@ -13,17 +30,21 @@ export function normalizeText(value) {
     .trim();
 }
 
-export function createMemoryId(scope, relativePath) {
-  return sha(`${scope}|${relativePath}`);
+export function createMemoryId(scope, storePath, relativePath) {
+  return sha(`${scope}|${storePath}|${relativePath}`);
 }
 
 export function resolveUserMemoryDir({ platform = process.platform, homeDir = os.homedir(), appData = process.env.APPDATA } = {}) {
   if (platform === 'win32') {
-    const root = appData || path.join(homeDir, 'AppData', 'Roaming');
+    const root = appData || path.win32.join(homeDir, 'AppData', 'Roaming');
     return path.win32.join(root, 'Code', 'User', 'copilot', 'memories');
   }
 
   return path.join(homeDir, '.vscode', 'copilot', 'memories');
+}
+
+export function resolveRootDir({ rootDir, workspaceDir = process.cwd() } = {}) {
+  return path.resolve(rootDir || workspaceDir);
 }
 
 export function resolveMemoryStore({ scope = 'user', workspaceDir = process.cwd(), platform, homeDir, appData } = {}) {
@@ -31,12 +52,13 @@ export function resolveMemoryStore({ scope = 'user', workspaceDir = process.cwd(
     return resolveUserMemoryDir({ platform, homeDir, appData });
   }
 
+  const root = resolveRootDir({ workspaceDir });
   if (scope === 'session') {
-    return path.join(workspaceDir, '.github', 'copilot', 'memories', 'session');
+    return path.join(root, '.github', 'copilot', 'memories', 'session');
   }
 
   if (scope === 'repo') {
-    return path.join(workspaceDir, '.github', 'copilot', 'memories');
+    return path.join(root, '.github', 'copilot', 'memories');
   }
 
   throw new Error('Scope must be one of "user", "session", or "repo".');
@@ -65,42 +87,98 @@ async function walkMemoryFiles(rootPath, currentPath, scope) {
   return files;
 }
 
-async function toMemory(rootPath, absolutePath, scope) {
+async function discoverScopedStores(scope, currentDir, rootDir, stores) {
+  const candidateRepoStore = path.join(currentDir, '.github', 'copilot', 'memories');
+  const candidateSessionStore = path.join(candidateRepoStore, 'session');
+
+  const repoStoreStats = await getPathStats(candidateRepoStore);
+  if (scope === 'repo' && repoStoreStats?.isDirectory()) {
+    stores.push({
+      scope,
+      workspacePath: currentDir,
+      storePath: candidateRepoStore,
+      relativeWorkspacePath: toPosix(path.relative(rootDir, currentDir)) || '.',
+    });
+  }
+
+  const sessionStoreStats = await getPathStats(candidateSessionStore);
+  if (scope === 'session' && sessionStoreStats?.isDirectory()) {
+    stores.push({
+      scope,
+      workspacePath: currentDir,
+      storePath: candidateSessionStore,
+      relativeWorkspacePath: toPosix(path.relative(rootDir, currentDir)) || '.',
+    });
+  }
+
+  const entries = await readdir(currentDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === '.github' || SKIPPED_DIRECTORIES.has(entry.name)) {
+      continue;
+    }
+
+    await discoverScopedStores(scope, path.join(currentDir, entry.name), rootDir, stores);
+  }
+}
+
+export async function discoverMemoryStores(options = {}) {
+  const scope = options.scope || 'repo';
+  if (scope === 'user') {
+    const storePath = resolveUserMemoryDir(options);
+    const exists = (await getPathStats(storePath))?.isDirectory();
+    return exists
+      ? [{
+          scope,
+          workspacePath: null,
+          storePath,
+          relativeWorkspacePath: 'User scope',
+        }]
+      : [];
+  }
+
+  const rootDir = resolveRootDir(options);
+  if (!(await getPathStats(rootDir))?.isDirectory()) {
+    return [];
+  }
+
+  const stores = [];
+  await discoverScopedStores(scope, rootDir, rootDir, stores);
+  stores.sort((left, right) => left.storePath.localeCompare(right.storePath));
+  return stores;
+}
+
+async function toMemory(store, absolutePath) {
   const [contents, details] = await Promise.all([
     readFile(absolutePath, 'utf8'),
     stat(absolutePath),
   ]);
 
-  const relativePath = path.relative(rootPath, absolutePath).split(path.sep).join('/');
-  const title = relativePath;
+  const relativePath = toPosix(path.relative(store.storePath, absolutePath));
+  const title = path.basename(relativePath);
 
   return {
-    id: createMemoryId(scope, relativePath),
+    id: createMemoryId(store.scope, store.storePath, relativePath),
     title,
     text: normalizeText(contents),
     relativePath,
     absolutePath,
-    scope,
+    scope: store.scope,
     size: details.size,
     modifiedAt: details.mtime.toISOString(),
+    storeId: createMemoryId(store.scope, store.storePath, '.'),
+    storePath: store.storePath,
+    workspacePath: store.workspacePath,
+    relativeWorkspacePath: store.relativeWorkspacePath,
   };
 }
 
-export async function listMemories(options = {}) {
-  const scope = options.scope || 'user';
-  const storePath = resolveMemoryStore({ ...options, scope });
+async function listStoreMemories(store) {
   let absoluteFiles;
-
   try {
-    absoluteFiles = await walkMemoryFiles(storePath, storePath, scope);
+    absoluteFiles = await walkMemoryFiles(store.storePath, store.storePath, store.scope);
   } catch (error) {
-    if (error && error.code === 'ENOENT') {
-      return {
-        exists: false,
-        storePath,
-        memories: [],
-        message: `No ${scope} memory directory was found at ${storePath}.`,
-      };
+    if (error?.code === 'ENOENT') {
+      return { ...store, exists: false, memories: [], memoryCount: 0 };
     }
     throw error;
   }
@@ -108,16 +186,46 @@ export async function listMemories(options = {}) {
   const memories = await Promise.all(
     absoluteFiles
       .sort((left, right) => left.localeCompare(right))
-      .map((absolutePath) => toMemory(storePath, absolutePath, scope)),
+      .map((absolutePath) => toMemory(store, absolutePath)),
   );
 
   return {
+    ...store,
     exists: true,
-    storePath,
+    id: createMemoryId(store.scope, store.storePath, '.'),
     memories,
-    message: memories.length
-      ? `Loaded ${memories.length} memory file${memories.length === 1 ? '' : 's'} from ${storePath}.`
-      : `No memory files were found in ${storePath}.`,
+    memoryCount: memories.length,
+  };
+}
+
+export async function listMemories(options = {}) {
+  const scope = options.scope || 'user';
+  const stores = await discoverMemoryStores(options);
+  const rootDir = scope === 'user' ? null : resolveRootDir(options);
+
+  if (!stores.length) {
+    return {
+      exists: false,
+      scope,
+      rootDir,
+      stores: [],
+      memories: [],
+      message: scope === 'user'
+        ? `No user memory directory was found at ${resolveUserMemoryDir(options)}.`
+        : `No ${scope} memory stores were found under ${rootDir}.`,
+    };
+  }
+
+  const populatedStores = await Promise.all(stores.map((store) => listStoreMemories(store)));
+  const memories = populatedStores.flatMap((store) => store.memories);
+
+  return {
+    exists: true,
+    scope,
+    rootDir,
+    stores: populatedStores,
+    memories,
+    message: `Loaded ${memories.length} memory file${memories.length === 1 ? '' : 's'} from ${populatedStores.length} store${populatedStores.length === 1 ? '' : 's'}.`,
   };
 }
 
@@ -126,14 +234,14 @@ export async function deleteMemory({ id, ...options }) {
     throw new Error('A memory id is required for deletion.');
   }
 
-  const { memories, storePath } = await listMemories(options);
+  const { memories } = await listMemories(options);
   const target = memories.find((memory) => memory.id === id);
   if (!target) {
     throw new Error('The requested memory entry could not be found. Refresh and try again.');
   }
 
-  const targetPath = path.resolve(storePath, target.relativePath);
-  const normalizedRoot = `${path.resolve(storePath)}${path.sep}`;
+  const targetPath = path.resolve(target.absolutePath);
+  const normalizedRoot = `${path.resolve(target.storePath)}${path.sep}`;
   if (!targetPath.startsWith(normalizedRoot)) {
     throw new Error('The requested memory entry is outside the allowed store path.');
   }
@@ -142,7 +250,8 @@ export async function deleteMemory({ id, ...options }) {
 
   return {
     deleted: true,
-    storePath,
+    storePath: target.storePath,
     deletedPath: target.relativePath,
+    storeId: target.storeId,
   };
 }

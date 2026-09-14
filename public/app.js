@@ -2,16 +2,24 @@ const scopeInput = document.querySelector('#scope');
 const searchInput = document.querySelector('#search');
 const refreshButton = document.querySelector('#refresh');
 const exportButton = document.querySelector('#export');
-const list = document.querySelector('#memories');
+const storesList = document.querySelector('#stores');
+const memoriesList = document.querySelector('#memories');
+const details = document.querySelector('#details');
 const count = document.querySelector('#count');
-const storePath = document.querySelector('#store-path');
-const workspacePath = document.querySelector('#workspace-path');
+const storeCount = document.querySelector('#store-count');
+const rootDir = document.querySelector('#root-dir');
 const status = document.querySelector('#status');
-const template = document.querySelector('#memory-template');
+const storeTemplate = document.querySelector('#store-template');
+const memoryTemplate = document.querySelector('#memory-template');
+const detailTemplate = document.querySelector('#detail-template');
 const confirmDialog = document.querySelector('#confirm-dialog');
 const confirmMessage = document.querySelector('#confirm-message');
 
+let rootPath = '-';
+let stores = [];
 let allMemories = [];
+let selectedStoreId = '';
+let selectedMemoryId = '';
 let pendingDeletion;
 
 function setStatus(message, isError = false) {
@@ -23,12 +31,25 @@ function selectedScope() {
   return scopeInput.value;
 }
 
-function filteredMemories() {
+function visibleMemories() {
   const query = searchInput.value.trim().toLowerCase();
-  if (!query) {
-    return allMemories;
-  }
-  return allMemories.filter((memory) => `${memory.relativePath} ${memory.text}`.toLowerCase().includes(query));
+  return allMemories.filter((memory) => {
+    if (selectedStoreId && memory.storeId !== selectedStoreId) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
+    return `${memory.relativePath} ${memory.relativeWorkspacePath} ${memory.text}`.toLowerCase().includes(query);
+  });
+}
+
+function formatTimestamp(value) {
+  return new Date(value).toLocaleString();
+}
+
+function storeLabel(store) {
+  return store.relativeWorkspacePath || 'User scope';
 }
 
 function downloadJson(filename, value) {
@@ -44,12 +65,71 @@ function downloadJson(filename, value) {
 async function loadConfig() {
   const response = await fetch('/api/config');
   const config = await response.json();
-  workspacePath.textContent = config.workspaceDir || '-';
+  rootPath = config.rootDir || '-';
+  rootDir.textContent = rootPath;
 }
 
-function render() {
-  const memories = filteredMemories();
-  list.replaceChildren();
+function syncSelection() {
+  if (!stores.some((store) => store.id === selectedStoreId)) {
+    selectedStoreId = stores[0]?.id || '';
+  }
+
+  const visible = visibleMemories();
+  if (!visible.some((memory) => memory.id === selectedMemoryId)) {
+    selectedMemoryId = visible[0]?.id || '';
+  }
+}
+
+function renderStores() {
+  storesList.replaceChildren();
+
+  if (!stores.length) {
+    const empty = document.createElement('li');
+    empty.className = 'empty-state';
+    empty.textContent = 'No stores found for this scope.';
+    storesList.append(empty);
+    return;
+  }
+
+  for (const store of stores) {
+    const node = storeTemplate.content.firstElementChild.cloneNode(true);
+    const button = node.querySelector('.store-button');
+    button.dataset.active = String(store.id === selectedStoreId);
+    button.querySelector('.store-name').textContent = storeLabel(store);
+    button.querySelector('.store-meta').textContent = `${store.memoryCount} file${store.memoryCount === 1 ? '' : 's'}`;
+    button.addEventListener('click', () => {
+      selectedStoreId = store.id;
+      syncSelection();
+      render();
+    });
+    storesList.append(node);
+  }
+}
+
+function renderDetails() {
+  details.replaceChildren();
+  const memory = visibleMemories().find((item) => item.id === selectedMemoryId);
+
+  if (!memory) {
+    details.className = 'details empty-state';
+    details.textContent = 'Select a memory to inspect its contents.';
+    return;
+  }
+
+  details.className = 'details';
+  const node = detailTemplate.content.firstElementChild.cloneNode(true);
+  node.querySelector('.detail-title').textContent = memory.title || memory.relativePath;
+  node.querySelector('.detail-meta').textContent = `${memory.relativeWorkspacePath} • ${memory.relativePath} • ${memory.size} bytes • ${formatTimestamp(memory.modifiedAt)}`;
+  node.querySelector('.detail-body').textContent = memory.text || '(empty file)';
+  const deleteButton = node.querySelector('.detail-delete-button');
+  deleteButton.setAttribute('aria-label', `Delete memory: ${memory.relativeWorkspacePath} ${memory.relativePath}`);
+  deleteButton.addEventListener('click', () => removeMemory(memory));
+  details.append(node);
+}
+
+function renderMemories() {
+  const memories = visibleMemories();
+  memoriesList.replaceChildren();
   count.textContent = String(memories.length);
 
   if (!memories.length) {
@@ -57,21 +137,32 @@ function render() {
     empty.className = 'empty-state';
     empty.textContent = searchInput.value.trim()
       ? 'No memories matched your current search.'
-      : 'No memory files were found for this scope.';
-    list.append(empty);
+      : 'No memories found in the selected store.';
+    memoriesList.append(empty);
     return;
   }
 
   for (const memory of memories) {
-    const node = template.content.firstElementChild.cloneNode(true);
-    node.querySelector('.memory-title').textContent = memory.title || memory.relativePath;
-    node.querySelector('.memory-meta').textContent = `${memory.relativePath} • ${memory.size} bytes • ${new Date(memory.modifiedAt).toLocaleString()}`;
-    node.querySelector('.memory-body').textContent = memory.text || '(empty file)';
-    const deleteButton = node.querySelector('.delete-button');
-    deleteButton.setAttribute('aria-label', `Delete memory: ${memory.relativePath}`);
-    deleteButton.addEventListener('click', () => removeMemory(memory));
-    list.append(node);
+    const node = memoryTemplate.content.firstElementChild.cloneNode(true);
+    const button = node.querySelector('.memory-button');
+    button.dataset.active = String(memory.id === selectedMemoryId);
+    button.querySelector('.memory-title').textContent = memory.relativePath;
+    button.querySelector('.memory-meta').textContent = `${memory.relativeWorkspacePath} • ${memory.size} bytes • ${formatTimestamp(memory.modifiedAt)}`;
+    button.addEventListener('click', () => {
+      selectedMemoryId = memory.id;
+      renderMemories();
+      renderDetails();
+    });
+    memoriesList.append(node);
   }
+}
+
+function render() {
+  storeCount.textContent = String(stores.length);
+  syncSelection();
+  renderStores();
+  renderMemories();
+  renderDetails();
 }
 
 async function refresh() {
@@ -82,8 +173,9 @@ async function refresh() {
     throw new Error(payload.error || 'Unable to load memories.');
   }
 
+  stores = payload.stores || [];
   allMemories = payload.memories || [];
-  storePath.textContent = payload.storePath || '-';
+  rootDir.textContent = payload.rootDir || rootPath;
   render();
   setStatus(payload.message || `Loaded ${allMemories.length} memory entries.`);
 }
@@ -103,16 +195,22 @@ async function executeDeletion(memory) {
     throw new Error(payload.error || 'Unable to delete memory.');
   }
 
-  if (payload.deleted) {
-    allMemories = allMemories.filter((item) => item.id !== memory.id);
-    render();
+  stores = stores.map((store) => (
+    store.id === payload.storeId
+      ? { ...store, memoryCount: Math.max(0, store.memoryCount - 1) }
+      : store
+  ));
+  allMemories = allMemories.filter((item) => item.id !== memory.id);
+  if (selectedMemoryId === memory.id) {
+    selectedMemoryId = '';
   }
+  render();
   setStatus(payload.deleted ? `Deleted ${payload.deletedPath}.` : 'Memory deleted.');
 }
 
 function removeMemory(memory) {
   pendingDeletion = memory;
-  confirmMessage.textContent = `Delete ${memory.relativePath}?`;
+  confirmMessage.textContent = `Delete ${memory.relativeWorkspacePath} / ${memory.relativePath}?`;
   confirmDialog.showModal();
 }
 
@@ -125,11 +223,15 @@ refreshButton.addEventListener('click', async () => {
 });
 
 exportButton.addEventListener('click', () => {
-  downloadJson(`github-copilot-memory-${selectedScope()}.json`, filteredMemories());
+  downloadJson(`github-copilot-memory-${selectedScope()}.json`, visibleMemories());
 });
 
-searchInput.addEventListener('input', render);
+searchInput.addEventListener('input', () => {
+  render();
+});
 scopeInput.addEventListener('change', () => {
+  selectedStoreId = '';
+  selectedMemoryId = '';
   refresh().catch((error) => setStatus(error.message, true));
 });
 confirmDialog.addEventListener('close', async () => {

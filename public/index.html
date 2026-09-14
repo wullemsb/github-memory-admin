@@ -8,9 +8,11 @@
   </head>
   <body>
     <main class="shell">
-      <header>
-        <h1>GitHub Memory Admin</h1>
-        <p>Browse, export, and prune GitHub Copilot memory files from your local user, session, and repository stores.</p>
+      <header class="page-header">
+        <div>
+          <h1>GitHub Memory Admin</h1>
+          <p>Browse, inspect, export, and prune GitHub Copilot memory files discovered under a local root directory.</p>
+        </div>
       </header>
 
       <section class="toolbar">
@@ -35,23 +37,43 @@
       </section>
 
       <section class="status" id="status">Ready.</section>
+
       <section class="summary">
         <div class="metric">
-          <span class="label">Visible entries</span>
+          <span class="label">Visible memories</span>
           <strong id="count">0</strong>
         </div>
         <div class="metric">
-          <span class="label">Store path</span>
-          <strong id="store-path">-</strong>
+          <span class="label">Stores</span>
+          <strong id="store-count">0</strong>
         </div>
-        <div class="metric">
-          <span class="label">Workspace</span>
-          <strong id="workspace-path">-</strong>
+        <div class="metric metric-wide">
+          <span class="label">Root directory</span>
+          <strong id="root-dir">-</strong>
         </div>
       </section>
 
-      <section>
-        <ul id="memories" class="memories"></ul>
+      <section class="workspace-layout">
+        <aside class="panel stores-panel">
+          <div class="panel-header">
+            <h2>Stores</h2>
+          </div>
+          <ul id="stores" class="stores"></ul>
+        </aside>
+
+        <section class="panel memories-panel">
+          <div class="panel-header">
+            <h2>Memories</h2>
+          </div>
+          <ul id="memories" class="memories"></ul>
+        </section>
+
+        <aside class="panel detail-panel">
+          <div class="panel-header">
+            <h2>Details</h2>
+          </div>
+          <div id="details" class="details empty-state">Select a memory to inspect its contents.</div>
+        </aside>
       </section>
     </main>
 
@@ -66,17 +88,31 @@
       </form>
     </dialog>
 
-    <template id="memory-template">
-      <li class="memory-card">
-        <div>
-          <h2 class="memory-title"></h2>
-          <p class="memory-meta"></p>
-          <p class="memory-body"></p>
-        </div>
-        <div class="memory-actions">
-          <button class="delete-button">Delete</button>
-        </div>
+    <template id="store-template">
+      <li>
+        <button class="store-button" type="button">
+          <span class="store-name"></span>
+          <span class="store-meta"></span>
+        </button>
       </li>
+    </template>
+
+    <template id="memory-template">
+      <li>
+        <button class="memory-button" type="button">
+          <span class="memory-title"></span>
+          <span class="memory-meta"></span>
+        </button>
+      </li>
+    </template>
+
+    <template id="detail-template">
+      <article class="detail-card">
+        <h3 class="detail-title"></h3>
+        <p class="detail-meta"></p>
+        <pre class="detail-body"></pre>
+        <button class="delete-button detail-delete-button" type="button">Delete</button>
+      </article>
     </template>
 
     <script type="module" src="/app.js"></script>

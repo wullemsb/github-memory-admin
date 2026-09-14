@@ -51,3 +51,19 @@ test('GET /api/memories validates the scope query parameter', async () => {
   assert.equal(response.statusCode, 400);
   assert.deepEqual(JSON.parse(response.body), { error: 'Scope must be one of "user", "session", or "repo".' });
 });
+
+test('GET /api/config returns the configured root directory', async () => {
+  const handler = createRequestHandler({ rootDir: '/scan/root' });
+  const response = makeResponse();
+  const request = {
+    method: 'GET',
+    url: '/api/config',
+    headers: { host: '127.0.0.1:4173' },
+  };
+
+  handler(request, response);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(JSON.parse(response.body), { rootDir: '/scan/root' });
+});

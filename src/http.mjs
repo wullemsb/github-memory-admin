@@ -82,7 +82,7 @@ export function createRequestHandler(options = {}) {
 
       if (url.pathname === '/api/config' && request.method === 'GET') {
         return json(response, 200, {
-          workspaceDir: options.workspaceDir || process.cwd(),
+          rootDir: options.rootDir || options.workspaceDir || process.cwd(),
         });
       }
 

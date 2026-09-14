@@ -17,13 +17,13 @@ function getArg(name, defaultValue) {
 
 const port = Number(getArg('port', process.env.PORT || 4173));
 const host = getArg('host', process.env.HOST || '127.0.0.1');
-const workspaceDir = path.resolve(getArg('workspace', process.cwd()));
+const rootDir = path.resolve(getArg('root', getArg('workspace', process.cwd())));
 
 const { url } = await startServer({
   port,
   host,
-  workspaceDir,
+  rootDir,
 });
 
 console.log(`GitHub Memory Admin is running at ${url}`);
-console.log(`Scanning workspace memory stores under ${workspaceDir}`);
+console.log(`Scanning for Copilot memory stores under ${rootDir}`);
