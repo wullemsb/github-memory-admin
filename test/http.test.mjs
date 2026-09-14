@@ -21,11 +21,11 @@ function makeResponse() {
 }
 
 async function waitForResponse(response) {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
     if (response.statusCode !== 0) {
       return;
     }
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
 
