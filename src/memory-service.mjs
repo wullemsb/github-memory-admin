@@ -61,12 +61,12 @@ export function resolveRootDir({ rootDir, workspaceDir, platform, homeDir, appDa
   return path.resolve(rootDir || workspaceDir || resolveWorkspaceStorageDir({ platform, homeDir, appData }));
 }
 
-export function resolveMemoryStore({ scope = 'user', workspaceDir = process.cwd(), platform, homeDir, appData } = {}) {
+export function resolveMemoryStore({ scope = 'user', rootDir, workspaceDir, platform, homeDir, appData } = {}) {
   if (scope === 'user') {
     return resolveUserMemoryDir({ platform, homeDir, appData });
   }
 
-  const root = resolveRootDir({ workspaceDir, platform, homeDir, appData });
+  const root = resolveRootDir({ rootDir, workspaceDir, platform, homeDir, appData });
   if (scope === 'session') {
     return path.join(root, 'github.copilot-chat', 'memory-tool', 'memories', 'session');
   }

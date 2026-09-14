@@ -11,6 +11,7 @@ import {
   discoverMemoryStores,
   listMemories,
   normalizeText,
+  resolveMemoryStore,
   resolveRootDir,
   resolveUserMemoryDir,
   resolveWorkspaceStorageDir,
@@ -90,6 +91,17 @@ test('resolveRootDir prefers the configured root directory', () => {
   assert.equal(resolveRootDir({ rootDir: '/scan/root', workspaceDir: '/workspace' }), '/scan/root');
   assert.equal(resolveRootDir({ workspaceDir: '/workspace' }), '/workspace');
   assert.equal(resolveRootDir({ platform: 'linux', homeDir: '/home/tester' }), '/home/tester/.config/Code/User/workspaceStorage');
+});
+
+test('resolveMemoryStore uses the configured or default VS Code storage roots', () => {
+  assert.equal(
+    resolveMemoryStore({ scope: 'repo', rootDir: '/scan/root' }),
+    '/scan/root/github.copilot-chat/memory-tool/memories/repo',
+  );
+  assert.equal(
+    resolveMemoryStore({ scope: 'session', platform: 'linux', homeDir: '/home/tester' }),
+    '/home/tester/.config/Code/User/workspaceStorage/github.copilot-chat/memory-tool/memories/session',
+  );
 });
 
 test('createMemoryId is stable for the same inputs', () => {
