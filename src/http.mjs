@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deleteMemory, listMemories } from './memory-service.mjs';
+import { deleteMemory, listMemories, resolveWorkspaceStorageDir } from './memory-service.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
@@ -85,7 +85,7 @@ export function createRequestHandler(options = {}) {
 
       if (url.pathname === '/api/config' && request.method === 'GET') {
         return json(response, 200, {
-          rootDir: options.rootDir || options.workspaceDir || process.cwd(),
+          rootDir: options.rootDir || options.workspaceDir || resolveWorkspaceStorageDir(options),
         });
       }
 

@@ -34,17 +34,31 @@ export function createMemoryId(scope, storePath, relativePath) {
   return sha(`${scope}|${storePath}|${relativePath}`);
 }
 
-export function resolveUserMemoryDir({ platform = process.platform, homeDir = os.homedir(), appData = process.env.APPDATA } = {}) {
+export function resolveCodeUserDir({ platform = process.platform, homeDir = os.homedir(), appData = process.env.APPDATA } = {}) {
   if (platform === 'win32') {
     const root = appData || path.win32.join(homeDir, 'AppData', 'Roaming');
-    return path.win32.join(root, 'Code', 'User', 'copilot', 'memories');
+    return path.win32.join(root, 'Code', 'User');
   }
 
-  return path.join(homeDir, '.vscode', 'copilot', 'memories');
+  if (platform === 'darwin') {
+    return path.join(homeDir, 'Library', 'Application Support', 'Code', 'User');
+  }
+
+  return path.join(homeDir, '.config', 'Code', 'User');
 }
 
-export function resolveRootDir({ rootDir, workspaceDir = process.cwd() } = {}) {
-  return path.resolve(rootDir || workspaceDir);
+export function resolveUserMemoryDir(options = {}) {
+  const join = (options.platform || process.platform) === 'win32' ? path.win32.join : path.join;
+  return join(resolveCodeUserDir(options), 'globalStorage', 'github.copilot-chat', 'memory-tool', 'memories');
+}
+
+export function resolveWorkspaceStorageDir(options = {}) {
+  const join = (options.platform || process.platform) === 'win32' ? path.win32.join : path.join;
+  return join(resolveCodeUserDir(options), 'workspaceStorage');
+}
+
+export function resolveRootDir({ rootDir, workspaceDir, platform, homeDir, appData } = {}) {
+  return path.resolve(rootDir || workspaceDir || resolveWorkspaceStorageDir({ platform, homeDir, appData }));
 }
 
 export function resolveMemoryStore({ scope = 'user', workspaceDir = process.cwd(), platform, homeDir, appData } = {}) {
@@ -52,13 +66,13 @@ export function resolveMemoryStore({ scope = 'user', workspaceDir = process.cwd(
     return resolveUserMemoryDir({ platform, homeDir, appData });
   }
 
-  const root = resolveRootDir({ workspaceDir });
+  const root = resolveRootDir({ workspaceDir, platform, homeDir, appData });
   if (scope === 'session') {
-    return path.join(root, '.github', 'copilot', 'memories', 'session');
+    return path.join(root, 'github.copilot-chat', 'memory-tool', 'memories', 'session');
   }
 
   if (scope === 'repo') {
-    return path.join(root, '.github', 'copilot', 'memories');
+    return path.join(root, 'github.copilot-chat', 'memory-tool', 'memories', 'repo');
   }
 
   throw new Error('Scope must be one of "user", "session", or "repo".');
@@ -88,8 +102,9 @@ async function walkMemoryFiles(rootPath, currentPath, scope) {
 }
 
 async function discoverScopedStores(scope, currentDir, rootDir, stores) {
-  const candidateRepoStore = path.join(currentDir, '.github', 'copilot', 'memories');
-  const candidateSessionStore = path.join(candidateRepoStore, 'session');
+  const candidateMemoriesRoot = path.join(currentDir, 'github.copilot-chat', 'memory-tool', 'memories');
+  const candidateRepoStore = path.join(candidateMemoriesRoot, 'repo');
+  const candidateSessionStore = path.join(candidateMemoriesRoot, 'session');
 
   const repoStoreStats = await getPathStats(candidateRepoStore);
   if (scope === 'repo' && repoStoreStats?.isDirectory()) {

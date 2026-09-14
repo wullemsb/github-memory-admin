@@ -5,13 +5,14 @@ A local admin UI for browsing and pruning GitHub Copilot memory files on disk.
 ## What it scans
 
 - **User scope**
-  - macOS/Linux: `~/.vscode/copilot/memories/`
-  - Windows: `%APPDATA%\\Code\\User\\copilot\\memories\\`
+  - Windows: `%APPDATA%\\Code\\User\\globalStorage\\github.copilot-chat\\memory-tool\\memories\\`
+  - macOS: `~/Library/Application Support/Code/User/globalStorage/github.copilot-chat/memory-tool/memories/`
+  - Linux: `~/.config/Code/User/globalStorage/github.copilot-chat/memory-tool/memories/`
 - **Session scope**
-  - every `.github/copilot/memories/session/` directory found under the selected root directory
+  - every `github.copilot-chat/memory-tool/memories/session/` directory found under the selected root directory
 - **Repository scope**
-  - every `.github/copilot/memories/` directory found under the selected root directory
-  - each repository store excludes its `session/` subdirectory from repository results
+  - every `github.copilot-chat/memory-tool/memories/repo/` directory found under the selected root directory
+  - by default the root directory is the local VS Code `workspaceStorage` directory
 
 The app only scans the local filesystem. It does not read or modify online GitHub memory data.
 
@@ -22,11 +23,11 @@ npm install
 npm start
 ```
 
-The app starts on `http://127.0.0.1:4173` by default and scans the current working directory recursively as the discovery root.
+The app starts on `http://127.0.0.1:4173` by default and scans the local VS Code `workspaceStorage` directory recursively as the discovery root.
 
 ## Usage
 
-- Start the app with `--root=/path/to/projects` to choose the directory tree to scan.
+- Start the app with `--root=/path/to/workspaceStorage` to choose the directory tree to scan.
 - Select **User memory**, **Session memory**, or **Repository memory**.
 - Pick a discovered store from the sidebar.
 - Inspect the matching memories and their contents.
