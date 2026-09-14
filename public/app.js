@@ -36,7 +36,7 @@ function visibleMemories() {
     if (!query) {
       return true;
     }
-    return `${memory.relativePath} ${memory.relativeWorkspacePath} ${memory.text}`.toLowerCase().includes(query);
+    return `${memory.relativePath} ${memory.relativeWorkspacePath} ${memory.workspaceLabel} ${memory.text}`.toLowerCase().includes(query);
   });
 }
 
@@ -45,7 +45,7 @@ function formatTimestamp(value) {
 }
 
 function storeLabel(store) {
-  return store.relativeWorkspacePath || 'User scope';
+  return store.workspaceLabel || store.relativeWorkspacePath || 'User scope';
 }
 
 function deleteScopeFor(memory) {
@@ -141,10 +141,10 @@ function renderDetails() {
   details.className = 'details';
   const node = detailTemplate.content.firstElementChild.cloneNode(true);
   node.querySelector('.detail-title').textContent = memory.title || memory.relativePath;
-  node.querySelector('.detail-meta').textContent = `${memory.relativeWorkspacePath} • ${memory.relativePath} • ${memory.size} bytes • ${formatTimestamp(memory.modifiedAt)}`;
+  node.querySelector('.detail-meta').textContent = `${storeLabel(memory)} • ${memory.relativePath} • ${memory.size} bytes • ${formatTimestamp(memory.modifiedAt)}`;
   node.querySelector('.detail-body').textContent = memory.text || '(empty file)';
   const deleteButton = node.querySelector('.detail-delete-button');
-  deleteButton.setAttribute('aria-label', `Delete memory: ${memory.relativeWorkspacePath} ${memory.relativePath}`);
+  deleteButton.setAttribute('aria-label', `Delete memory: ${storeLabel(memory)} ${memory.relativePath}`);
   deleteButton.addEventListener('click', () => removeMemory(memory));
   details.append(node);
 }
@@ -169,7 +169,7 @@ function renderMemories() {
     const button = node.querySelector('.memory-button');
     button.dataset.active = String(memory.id === selectedMemoryId);
     button.querySelector('.memory-title').textContent = memory.relativePath;
-    button.querySelector('.memory-meta').textContent = `${memory.relativeWorkspacePath} • ${memory.size} bytes • ${formatTimestamp(memory.modifiedAt)}`;
+    button.querySelector('.memory-meta').textContent = `${storeLabel(memory)} • ${memory.size} bytes • ${formatTimestamp(memory.modifiedAt)}`;
     button.addEventListener('click', () => {
       selectedMemoryId = memory.id;
       renderMemories();
@@ -236,7 +236,7 @@ async function executeDeletion(memory) {
 
 function removeMemory(memory) {
   pendingDeletion = memory;
-  confirmMessage.textContent = `Delete ${memory.relativeWorkspacePath} / ${memory.relativePath}?`;
+  confirmMessage.textContent = `Delete ${storeLabel(memory)} / ${memory.relativePath}?`;
   confirmDialog.showModal();
 }
 

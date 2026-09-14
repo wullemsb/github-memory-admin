@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules']);
 
@@ -22,6 +23,52 @@ async function getPathStats(targetPath) {
 
 function toPosix(relativePath) {
   return relativePath.split(path.sep).join('/');
+}
+
+function workspaceNameFromReference(reference) {
+  if (!reference) {
+    return '';
+  }
+
+  try {
+    if (reference.startsWith('file:')) {
+      return path.basename(fileURLToPath(reference));
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(reference)) {
+      return path.posix.basename(new URL(reference).pathname);
+    }
+  } catch {
+    return path.basename(reference);
+  }
+
+  return path.basename(reference);
+}
+
+async function resolveWorkspaceLabel(workspacePath, fallbackLabel) {
+  if (!workspacePath) {
+    return fallbackLabel;
+  }
+
+  try {
+    const contents = await readFile(path.join(workspacePath, 'workspace.json'), 'utf8');
+    const workspace = JSON.parse(contents);
+    const folderName = workspaceNameFromReference(workspace.folder);
+    if (folderName) {
+      return folderName;
+    }
+
+    const configName = workspaceNameFromReference(workspace.configPath);
+    if (configName) {
+      return configName.replace(/\.code-workspace$/i, '');
+    }
+  } catch (error) {
+    if (!['ENOENT', 'EACCES', 'EPERM'].includes(error?.code) && !(error instanceof SyntaxError)) {
+      throw error;
+    }
+  }
+
+  return fallbackLabel;
 }
 
 export function normalizeText(value) {
@@ -105,6 +152,8 @@ async function discoverScopedStores(scope, currentDir, rootDir, stores) {
   const candidateMemoriesRoot = path.join(currentDir, 'github.copilot-chat', 'memory-tool', 'memories');
   const candidateRepoStore = path.join(candidateMemoriesRoot, 'repo');
   const candidateSessionStore = path.join(candidateMemoriesRoot, 'session');
+  const relativeWorkspacePath = toPosix(path.relative(rootDir, currentDir)) || '.';
+  const workspaceLabel = await resolveWorkspaceLabel(currentDir, relativeWorkspacePath);
 
   const repoStoreStats = await getPathStats(candidateRepoStore);
   if (scope === 'repo' && repoStoreStats?.isDirectory()) {
@@ -112,7 +161,8 @@ async function discoverScopedStores(scope, currentDir, rootDir, stores) {
       scope,
       workspacePath: currentDir,
       storePath: candidateRepoStore,
-      relativeWorkspacePath: toPosix(path.relative(rootDir, currentDir)) || '.',
+      relativeWorkspacePath,
+      workspaceLabel,
     });
   }
 
@@ -122,7 +172,8 @@ async function discoverScopedStores(scope, currentDir, rootDir, stores) {
       scope,
       workspacePath: currentDir,
       storePath: candidateSessionStore,
-      relativeWorkspacePath: toPosix(path.relative(rootDir, currentDir)) || '.',
+      relativeWorkspacePath,
+      workspaceLabel,
     });
   }
 
@@ -155,6 +206,7 @@ export async function discoverMemoryStores(options = {}) {
           workspacePath: null,
           storePath,
           relativeWorkspacePath: 'User scope',
+          workspaceLabel: 'User scope',
         }]
       : [];
   }
@@ -192,6 +244,7 @@ async function toMemory(store, absolutePath) {
     storePath: store.storePath,
     workspacePath: store.workspacePath,
     relativeWorkspacePath: store.relativeWorkspacePath,
+    workspaceLabel: store.workspaceLabel,
   };
 }
 
