@@ -49,11 +49,12 @@ function storeLabel(store) {
 }
 
 function deleteScopeFor(memory) {
-  if (memory.scope === 'user' || memory.scope === 'repo') {
-    return memory.scope;
+  const scope = stores.find((store) => store.id === memory.storeId)?.scope || memory.scope;
+  if (scope === 'user' || scope === 'session' || scope === 'repo') {
+    return scope;
   }
 
-  throw new Error(`Memories from scope "${memory.scope}" cannot be deleted from the current view.`);
+  throw new Error(`Memories from scope "${scope}" cannot be deleted from the current view.`);
 }
 
 function downloadJson(filename, value) {
