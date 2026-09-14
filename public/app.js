@@ -49,7 +49,7 @@ function storeLabel(store) {
 }
 
 function deleteScopeFor(memory) {
-  if (memory.scope === 'user' || memory.scope === 'session' || memory.scope === 'repo') {
+  if (memory.scope === 'user' || memory.scope === 'repo') {
     return memory.scope;
   }
 
