@@ -33,6 +33,7 @@ The app starts on `http://127.0.0.1:4173` by default and scans the local VS Code
 - Inspect the matching memories and their contents.
 - Use **Export JSON** to download the filtered result set.
 - Use **Delete** to remove a specific local memory file.
+- The browser UI exposes that combined user/repository view; the HTTP API still accepts `user`, `session`, `repo`, and `combined` scopes for direct requests.
 
 ## CLI options
 
