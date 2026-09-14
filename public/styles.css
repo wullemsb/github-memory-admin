@@ -1,0 +1,230 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, system-ui, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+}
+
+.shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+header p,
+.status,
+.empty-state,
+.memory-meta,
+.store-meta,
+.detail-meta {
+  color: #cbd5e1;
+}
+
+.toolbar,
+.summary,
+.status,
+.panel,
+.dialog-card,
+.store-button,
+.memory-button,
+.detail-card {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+input,
+select,
+button {
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: #2563eb;
+  color: white;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.status,
+.summary,
+.panel {
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.metric-wide {
+  grid-column: span 1;
+}
+
+.metric .label,
+.panel-header h2 {
+  display: block;
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
+
+.metric strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(280px, 420px) minmax(320px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.panel {
+  min-height: 26rem;
+}
+
+.stores,
+.memories {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.store-button,
+.memory-button {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.store-button[data-active='true'],
+.memory-button[data-active='true'] {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px #60a5fa inset;
+}
+
+.store-name,
+.memory-title {
+  font-weight: 600;
+}
+
+.store-meta,
+.memory-meta,
+.detail-meta {
+  font-size: 0.9rem;
+}
+
+.details {
+  min-height: 20rem;
+}
+
+.detail-card {
+  padding: 1rem;
+}
+
+.detail-title {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.detail-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: 1rem;
+  color: #e2e8f0;
+}
+
+.delete-button {
+  background: #dc2626;
+}
+
+.secondary-button {
+  background: transparent;
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+}
+
+.status[data-error='true'] {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+
+dialog {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+dialog::backdrop {
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.dialog-card {
+  max-width: 32rem;
+  padding: 1.25rem;
+}
+
+.dialog-card menu {
+  display: flex;
+  justify-content: end;
+  gap: 0.75rem;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+@media (max-width: 1100px) {
+  .workspace-layout,
+  .summary {
+    grid-template-columns: 1fr;
+  }
+}

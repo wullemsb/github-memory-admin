@@ -1,0 +1,25 @@
+{
+  "name": "github-memory-admin",
+  "version": "0.1.0",
+  "description": "Local admin UI for browsing and pruning GitHub Copilot memory files",
+  "type": "module",
+  "bin": {
+    "github-memory-admin": "bin/github-memory-admin.mjs"
+  },
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node bin/github-memory-admin.mjs",
+    "test": "node --test"
+  },
+  "keywords": [
+    "github",
+    "copilot",
+    "memory",
+    "admin"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

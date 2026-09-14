@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Memory Admin</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="page-header">
+        <div>
+          <h1>GitHub Memory Admin</h1>
+          <p>Browse, inspect, export, and prune GitHub Copilot memory files discovered under a local root directory.</p>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <label>
+          Scope
+          <select id="scope">
+            <option value="user">User memory</option>
+            <option value="session">Session memory</option>
+            <option value="repo">Repository memory</option>
+          </select>
+        </label>
+
+        <label>
+          Search
+          <input id="search" placeholder="Filter memories" spellcheck="false" />
+        </label>
+
+        <div class="actions">
+          <button id="refresh">Refresh</button>
+          <button id="export">Export JSON</button>
+        </div>
+      </section>
+
+      <section class="status" id="status">Ready.</section>
+
+      <section class="summary">
+        <div class="metric">
+          <span class="label">Visible memories</span>
+          <strong id="count">0</strong>
+        </div>
+        <div class="metric">
+          <span class="label">Stores</span>
+          <strong id="store-count">0</strong>
+        </div>
+        <div class="metric metric-wide">
+          <span class="label">Root directory</span>
+          <strong id="root-dir">-</strong>
+        </div>
+      </section>
+
+      <section class="workspace-layout">
+        <aside class="panel stores-panel">
+          <div class="panel-header">
+            <h2>Stores</h2>
+          </div>
+          <ul id="stores" class="stores"></ul>
+        </aside>
+
+        <section class="panel memories-panel">
+          <div class="panel-header">
+            <h2>Memories</h2>
+          </div>
+          <ul id="memories" class="memories"></ul>
+        </section>
+
+        <aside class="panel detail-panel">
+          <div class="panel-header">
+            <h2>Details</h2>
+          </div>
+          <div id="details" class="details empty-state">Select a memory to inspect its contents.</div>
+        </aside>
+      </section>
+    </main>
+
+    <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <form method="dialog" class="dialog-card">
+        <h2 id="confirm-title">Delete memory</h2>
+        <p id="confirm-message"></p>
+        <menu>
+          <button value="cancel" class="secondary-button">Cancel</button>
+          <button value="confirm" id="confirm-delete" class="delete-button">Delete</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <template id="store-template">
+      <li>
+        <button class="store-button" type="button">
+          <span class="store-name"></span>
+          <span class="store-meta"></span>
+        </button>
+      </li>
+    </template>
+
+    <template id="memory-template">
+      <li>
+        <button class="memory-button" type="button">
+          <span class="memory-title"></span>
+          <span class="memory-meta"></span>
+        </button>
+      </li>
+    </template>
+
+    <template id="detail-template">
+      <article class="detail-card">
+        <h3 class="detail-title"></h3>
+        <p class="detail-meta"></p>
+        <pre class="detail-body"></pre>
+        <button class="delete-button detail-delete-button" type="button">Delete</button>
+      </article>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
