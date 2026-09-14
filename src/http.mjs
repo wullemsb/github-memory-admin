@@ -76,6 +76,9 @@ export function createRequestHandler(options = {}) {
       if (url.pathname === '/api/memories' && request.method === 'DELETE') {
         const body = await readBody(request);
         const scope = validateScope(body.scope);
+        if (!body.id) {
+          throw validationError('A memory id is required for deletion.');
+        }
         const result = await deleteMemory({ ...options, scope, id: body.id });
         return json(response, 200, result);
       }

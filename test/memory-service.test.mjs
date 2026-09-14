@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
+import { chmodSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import {
   createMemoryId,
@@ -112,4 +113,22 @@ test('deleteMemory removes the selected local file from the matching discovered 
     readFile(path.join(betaWorkspace, '.github', 'copilot', 'memories', 'ideas.md'), 'utf8'),
     /ENOENT/,
   );
+});
+
+test('discoverMemoryStores skips unreadable directories', async () => {
+  if (process.platform === 'win32') {
+    return;
+  }
+
+  const { rootDir, homeDir } = await createFixture();
+  const blockedDir = path.join(rootDir, 'blocked');
+  await mkdir(blockedDir, { recursive: true });
+  chmodSync(blockedDir, 0o000);
+
+  try {
+    const stores = await discoverMemoryStores({ scope: 'repo', rootDir, homeDir, platform: 'linux' });
+    assert.deepEqual(stores.map((store) => store.relativeWorkspacePath), ['alpha', 'nested/beta']);
+  } finally {
+    chmodSync(blockedDir, 0o755);
+  }
 });

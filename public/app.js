@@ -21,6 +21,7 @@ let allMemories = [];
 let selectedStoreId = '';
 let selectedMemoryId = '';
 let pendingDeletion;
+let refreshRequestId = 0;
 
 function setStatus(message, isError = false) {
   status.textContent = message;
@@ -166,9 +167,14 @@ function render() {
 }
 
 async function refresh() {
+  const requestId = ++refreshRequestId;
+  const scope = selectedScope();
   setStatus('Loading memories...');
-  const response = await fetch(`/api/memories?scope=${selectedScope()}`);
+  const response = await fetch(`/api/memories?scope=${scope}`);
   const payload = await response.json();
+  if (requestId !== refreshRequestId) {
+    return;
+  }
   if (!response.ok) {
     throw new Error(payload.error || 'Unable to load memories.');
   }

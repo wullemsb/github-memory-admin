@@ -13,7 +13,7 @@ async function getPathStats(targetPath) {
   try {
     return await stat(targetPath);
   } catch (error) {
-    if (error?.code === 'ENOENT') {
+    if (error?.code === 'ENOENT' || error?.code === 'EACCES' || error?.code === 'EPERM') {
       return null;
     }
     throw error;
@@ -111,7 +111,15 @@ async function discoverScopedStores(scope, currentDir, rootDir, stores) {
     });
   }
 
-  const entries = await readdir(currentDir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(currentDir, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === 'EACCES' || error?.code === 'EPERM') {
+      return;
+    }
+    throw error;
+  }
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name === '.github' || SKIPPED_DIRECTORIES.has(entry.name)) {
       continue;

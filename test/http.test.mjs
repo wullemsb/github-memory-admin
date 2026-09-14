@@ -67,3 +67,22 @@ test('GET /api/config returns the configured root directory', async () => {
   assert.equal(response.statusCode, 200);
   assert.deepEqual(JSON.parse(response.body), { rootDir: '/scan/root' });
 });
+
+test('DELETE /api/memories requires a memory id', async () => {
+  const handler = createRequestHandler();
+  const response = makeResponse();
+  const request = {
+    method: 'DELETE',
+    url: '/api/memories',
+    headers: { host: '127.0.0.1:4173' },
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.from(JSON.stringify({ scope: 'repo' }));
+    },
+  };
+
+  handler(request, response);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(JSON.parse(response.body), { error: 'A memory id is required for deletion.' });
+});
