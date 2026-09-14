@@ -231,10 +231,14 @@ export async function listMemories(options = {}) {
     const stores = [...userResult.stores, ...repoResult.stores];
     const memories = [...userResult.memories, ...repoResult.memories];
     const rootDir = resolveRootDir(options);
+    const userExists = userResult.exists;
+    const repoExists = repoResult.exists;
 
     if (!stores.length) {
       return {
         exists: false,
+        userExists,
+        repoExists,
         scope,
         rootDir,
         stores: [],
@@ -244,7 +248,9 @@ export async function listMemories(options = {}) {
     }
 
     return {
-      exists: true,
+      exists: userExists || repoExists,
+      userExists,
+      repoExists,
       scope,
       rootDir,
       stores,

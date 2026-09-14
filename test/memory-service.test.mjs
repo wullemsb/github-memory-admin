@@ -146,6 +146,9 @@ test('listMemories can combine user and repository memories for the UI', async (
 
   const result = await listMemories({ scope: 'combined', rootDir, homeDir, platform: 'linux' });
 
+  assert.equal(result.exists, true);
+  assert.equal(result.userExists, true);
+  assert.equal(result.repoExists, true);
   assert.equal(result.stores.length, 3);
   assert.deepEqual(result.stores.map((store) => `${store.scope}:${store.relativeWorkspacePath}`), [
     'user:User scope',
@@ -165,6 +168,20 @@ test('listMemories reports missing stores without throwing', async () => {
   assert.equal(result.exists, false);
   assert.equal(result.memories.length, 0);
   assert.match(result.message, /No repo memory stores were found/i);
+});
+
+test('listMemories reports per-scope availability for combined results', async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'github-memory-admin-'));
+  const homeDir = path.join(tempDir, 'home');
+  const rootDir = path.join(homeDir, '.config', 'Code', 'User', 'workspaceStorage');
+  await seedFile(path.join(rootDir, 'alpha-hash', 'github.copilot-chat', 'memory-tool', 'memories', 'repo', 'repo.md'), 'Repository memory');
+
+  const result = await listMemories({ scope: 'combined', rootDir, homeDir, platform: 'linux' });
+
+  assert.equal(result.exists, true);
+  assert.equal(result.userExists, false);
+  assert.equal(result.repoExists, true);
+  assert.equal(result.memories.length, 1);
 });
 
 test('deleteMemory removes the selected local file from the matching discovered store', async () => {
