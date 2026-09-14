@@ -1,4 +1,3 @@
-const scopeInput = document.querySelector('#scope');
 const searchInput = document.querySelector('#search');
 const refreshButton = document.querySelector('#refresh');
 const exportButton = document.querySelector('#export');
@@ -28,10 +27,6 @@ function setStatus(message, isError = false) {
   status.dataset.error = isError ? 'true' : 'false';
 }
 
-function selectedScope() {
-  return scopeInput.value;
-}
-
 function visibleMemories() {
   const query = searchInput.value.trim().toLowerCase();
   return allMemories.filter((memory) => {
@@ -53,6 +48,15 @@ function storeLabel(store) {
   return store.relativeWorkspacePath || 'User scope';
 }
 
+function deleteScopeFor(memory) {
+  const scope = stores.find((store) => store.id === memory.storeId)?.scope || memory.scope;
+  if (scope === 'user' || scope === 'session' || scope === 'repo') {
+    return scope;
+  }
+
+  throw new Error(`Memories from scope "${scope}" cannot be deleted from the current view.`);
+}
+
 function downloadJson(filename, value) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -61,6 +65,14 @@ function downloadJson(filename, value) {
   link.download = filename;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+function exportFileName() {
+  const store = stores.find((item) => item.id === selectedStoreId);
+  const scope = store?.scope || 'combined';
+  const label = (store ? storeLabel(store) : 'all-stores').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `github-copilot-memory-${scope}-${label || 'store'}-${timestamp}.json`;
 }
 
 async function loadConfig() {
@@ -87,12 +99,21 @@ function renderStores() {
   if (!stores.length) {
     const empty = document.createElement('li');
     empty.className = 'empty-state';
-    empty.textContent = 'No stores found for this scope.';
+    empty.textContent = 'No user or repository memory stores found.';
     storesList.append(empty);
     return;
   }
 
+  let currentScope = '';
   for (const store of stores) {
+    if (store.scope !== currentScope) {
+      currentScope = store.scope;
+      const section = document.createElement('li');
+      section.className = 'store-section';
+      section.textContent = store.scope === 'user' ? 'User scope' : 'Repository scope';
+      storesList.append(section);
+    }
+
     const node = storeTemplate.content.firstElementChild.cloneNode(true);
     const button = node.querySelector('.store-button');
     button.dataset.active = String(store.id === selectedStoreId);
@@ -168,9 +189,8 @@ function render() {
 
 async function refresh() {
   const requestId = ++refreshRequestId;
-  const scope = selectedScope();
   setStatus('Loading memories...');
-  const response = await fetch(`/api/memories?scope=${scope}`);
+  const response = await fetch('/api/memories?scope=combined');
   const payload = await response.json();
   if (requestId !== refreshRequestId) {
     return;
@@ -193,7 +213,7 @@ async function executeDeletion(memory) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       id: memory.id,
-      scope: selectedScope(),
+      scope: deleteScopeFor(memory),
     }),
   });
   const payload = await response.json();
@@ -229,16 +249,11 @@ refreshButton.addEventListener('click', async () => {
 });
 
 exportButton.addEventListener('click', () => {
-  downloadJson(`github-copilot-memory-${selectedScope()}.json`, visibleMemories());
+  downloadJson(exportFileName(), visibleMemories());
 });
 
 searchInput.addEventListener('input', () => {
   render();
-});
-scopeInput.addEventListener('change', () => {
-  selectedStoreId = '';
-  selectedMemoryId = '';
-  refresh().catch((error) => setStatus(error.message, true));
 });
 confirmDialog.addEventListener('close', async () => {
   if (confirmDialog.returnValue !== 'confirm' || !pendingDeletion) {

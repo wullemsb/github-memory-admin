@@ -28,7 +28,7 @@ The app starts on `http://127.0.0.1:4173` by default and scans the local VS Code
 ## Usage
 
 - Start the app with `--root=/path/to/workspaceStorage` to choose the directory tree to scan.
-- Select **User memory**, **Session memory**, or **Repository memory**.
+- Review the combined view with **User scope** first, followed by discovered **Repository scope** stores.
 - Pick a discovered store from the sidebar.
 - Inspect the matching memories and their contents.
 - Use **Export JSON** to download the filtered result set.

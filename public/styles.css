@@ -59,7 +59,6 @@ label {
 }
 
 input,
-select,
 button {
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
@@ -74,7 +73,6 @@ button {
 }
 
 input:focus-visible,
-select:focus-visible,
 button:focus-visible {
   outline: 3px solid #93c5fd;
   outline-offset: 2px;
@@ -153,6 +151,15 @@ button:focus-visible {
 .store-name,
 .memory-title {
   font-weight: 600;
+}
+
+.store-section {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+  padding: 0.25rem 0;
 }
 
 .store-meta,

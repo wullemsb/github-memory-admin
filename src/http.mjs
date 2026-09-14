@@ -5,7 +5,8 @@ import { deleteMemory, listMemories, resolveWorkspaceStorageDir } from './memory
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
-const VALID_SCOPES = new Set(['user', 'session', 'repo']);
+const READ_SCOPES = new Set(['user', 'session', 'repo', 'combined']);
+const WRITE_SCOPES = new Set(['user', 'session', 'repo']);
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -41,10 +42,10 @@ async function readBody(request) {
   }
 }
 
-function validateScope(scope) {
+function validateScope(scope, validScopes, message) {
   const normalizedScope = scope || 'user';
-  if (!VALID_SCOPES.has(normalizedScope)) {
-    throw validationError('Scope must be one of "user", "session", or "repo".');
+  if (!validScopes.has(normalizedScope)) {
+    throw validationError(message);
   }
   return normalizedScope;
 }
@@ -68,14 +69,22 @@ export function createRequestHandler(options = {}) {
       const url = new URL(request.url, `http://${request.headers.host || '127.0.0.1'}`);
 
       if (url.pathname === '/api/memories' && request.method === 'GET') {
-        const scope = validateScope(url.searchParams.get('scope'));
+        const scope = validateScope(
+          url.searchParams.get('scope'),
+          READ_SCOPES,
+          'Scope must be one of "user", "session", "repo", or "combined".',
+        );
         const result = await listMemories({ ...options, scope });
         return json(response, 200, result);
       }
 
       if (url.pathname === '/api/memories' && request.method === 'DELETE') {
         const body = await readBody(request);
-        const scope = validateScope(body.scope);
+        const scope = validateScope(
+          body.scope,
+          WRITE_SCOPES,
+          'Scope must be one of "user", "session", or "repo".',
+        );
         if (!body.id) {
           throw validationError('A memory id is required for deletion.');
         }
