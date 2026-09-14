@@ -115,3 +115,22 @@ test('DELETE /api/memories requires a memory id', async () => {
   assert.equal(response.statusCode, 400);
   assert.deepEqual(JSON.parse(response.body), { error: 'A memory id is required for deletion.' });
 });
+
+test('DELETE /api/memories rejects the combined scope', async () => {
+  const handler = createRequestHandler();
+  const response = makeResponse();
+  const request = {
+    method: 'DELETE',
+    url: '/api/memories',
+    headers: { host: '127.0.0.1:4173' },
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.from(JSON.stringify({ scope: 'combined', id: 'memory-id' }));
+    },
+  };
+
+  handler(request, response);
+  await waitForResponse(response);
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(JSON.parse(response.body), { error: 'Scope must be one of "user", "session", or "repo".' });
+});
