@@ -67,6 +67,14 @@ function downloadJson(filename, value) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
+function exportFileName() {
+  const store = stores.find((item) => item.id === selectedStoreId);
+  const scope = store?.scope || 'combined';
+  const label = (store ? storeLabel(store) : 'all-stores').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `github-copilot-memory-${scope}-${label || 'store'}-${timestamp}.json`;
+}
+
 async function loadConfig() {
   const response = await fetch('/api/config');
   const config = await response.json();
@@ -241,7 +249,7 @@ refreshButton.addEventListener('click', async () => {
 });
 
 exportButton.addEventListener('click', () => {
-  downloadJson('github-copilot-memory.json', visibleMemories());
+  downloadJson(exportFileName(), visibleMemories());
 });
 
 searchInput.addEventListener('input', () => {
