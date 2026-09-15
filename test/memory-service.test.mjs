@@ -30,8 +30,10 @@ async function createFixture() {
   const betaWorkspace = path.join(rootDir, 'nested', 'beta-hash');
 
   await seedFile(path.join(homeDir, '.config', 'Code', 'User', 'globalStorage', 'github.copilot-chat', 'memory-tool', 'memories', 'user.md'), 'Use TypeScript');
+  await seedFile(path.join(alphaWorkspace, 'workspace.json'), JSON.stringify({ folder: 'file:///workspace/alpha-repo' }));
   await seedFile(path.join(alphaWorkspace, 'github.copilot-chat', 'memory-tool', 'memories', 'repo', 'repo.md'), 'Repository memory');
   await seedFile(path.join(alphaWorkspace, 'github.copilot-chat', 'memory-tool', 'memories', 'session', 'task.md'), 'Session memory');
+  await seedFile(path.join(betaWorkspace, 'workspace.json'), JSON.stringify({ folder: 'file:///workspace/beta-repo' }));
   await seedFile(path.join(betaWorkspace, 'github.copilot-chat', 'memory-tool', 'memories', 'repo', 'ideas.md'), 'Beta repo memory');
   await seedFile(path.join(betaWorkspace, 'github.copilot-chat', 'memory-tool', 'memories', 'session', 'draft.md'), 'Beta session memory');
 
@@ -124,6 +126,17 @@ test('discoverMemoryStores finds recursive repo and session stores under the con
   assert.equal(userStores[0].relativeWorkspacePath, 'User scope');
 });
 
+test('discoverMemoryStores resolves repository labels from workspace metadata', async () => {
+  const { rootDir, homeDir } = await createFixture();
+
+  const repoStores = await discoverMemoryStores({ scope: 'repo', rootDir, homeDir, platform: 'linux' });
+
+  assert.deepEqual(repoStores.map((store) => `${store.relativeWorkspacePath}:${store.workspaceLabel}`), [
+    'alpha-hash:alpha-repo',
+    'nested/beta-hash:beta-repo',
+  ]);
+});
+
 test('listMemories aggregates memories from all discovered stores', async () => {
   const { rootDir, homeDir } = await createFixture();
 
@@ -159,6 +172,16 @@ test('listMemories can combine user and repository memories for the UI', async (
     'user:User scope:user.md',
     'repo:alpha-hash:repo.md',
     'repo:nested/beta-hash:ideas.md',
+  ]);
+  assert.deepEqual(result.stores.map((store) => `${store.scope}:${store.workspaceLabel}`), [
+    'user:User scope',
+    'repo:alpha-repo',
+    'repo:beta-repo',
+  ]);
+  assert.deepEqual(result.memories.map((memory) => `${memory.scope}:${memory.workspaceLabel}:${memory.relativePath}`), [
+    'user:User scope:user.md',
+    'repo:alpha-repo:repo.md',
+    'repo:beta-repo:ideas.md',
   ]);
 });
 
